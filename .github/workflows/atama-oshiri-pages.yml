@@ -1,14 +1,16 @@
-name: Deploy あたまとおしり to GitHub Pages
+name: Deploy games to GitHub Pages
 
 # main に push されたら、サイトを組み立てて gh-pages ブランチに置く。
 # GitHub Pages は gh-pages ブランチから配信される。
 # 公開先: https://kouheim1979.github.io/launch-roulette/atama-oshiri/
+#         https://kouheim1979.github.io/launch-roulette/yakitori/
 
 on:
   push:
     branches: [main]
     paths:
       - "atama-oshiri/**"
+      - "yakitori/**"
       - ".github/workflows/atama-oshiri-pages.yml"
   workflow_dispatch:
 
@@ -28,13 +30,19 @@ jobs:
         run: |
           mkdir -p _site
           cp -r atama-oshiri _site/atama-oshiri
+          cp -r yakitori _site/yakitori
           cat > _site/index.html <<'HTML'
           <!doctype html>
           <html lang="ja">
           <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
           <title>launch-roulette</title>
-          <meta http-equiv="refresh" content="0; url=./atama-oshiri/">
-          <p><a href="./atama-oshiri/">あたまとおしり</a></p>
+          <style>body{font-family:sans-serif;max-width:480px;margin:40px auto;padding:0 16px;line-height:2}</style>
+          <h1>ゲーム</h1>
+          <ul>
+          <li><a href="./atama-oshiri/">あたまとおしり</a></li>
+          <li><a href="./yakitori/">やきとり ならべ</a></li>
+          </ul>
           </html>
           HTML
           touch _site/.nojekyll
