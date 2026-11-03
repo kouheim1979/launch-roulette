@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="description" content="焼き台の串を入れかえて同じ串を3本そろえ、焼いてお客さんの注文に届けるパズルゲーム。">
+<meta name="theme-color" content="#F4EBDD" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1410" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="やきとり屋">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>やきとり ならべ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+:root {
+  --paper: #F4EBDD;
+  --wood: #E2C9A2;
+  --wood-2: #CFAF80;
+  --card: #FFFBF4;
+  --ink: #3A2418;
+  --muted: #7D6350;
+  --line: #D9C4A6;
+  --noren: #B8362A;
+  --noren-ink: #FFF6EA;
+  --grill: #34302E;
+  --grill-rim: #1F1C1B;
+  --bar: #55504D;
+  --ember: #FF7A2E;
+  --ok: #2E8B57;
+  --bad: #C2402F;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1C1410; --wood: #3B2A1E; --wood-2: #4A3526; --card: #2A1E17; --ink: #F5E9DA; --muted: #BFA58C;
+    --line: #4C3A2C; --noren: #D2493A; --noren-ink: #FFF6EA; --grill: #2A2624; --grill-rim: #0E0C0B; --bar: #45403D;
+    --ok: #4CC184; --bad: #F07160; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1C1410; --wood: #3B2A1E; --wood-2: #4A3526; --card: #2A1E17; --ink: #F5E9DA; --muted: #BFA58C;
+  --line: #4C3A2C; --noren: #D2493A; --noren-ink: #FFF6EA; --grill: #2A2624; --grill-rim: #0E0C0B; --bar: #45403D;
+  --ok: #4CC184; --bad: #F07160; color-scheme: dark;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+.board, .board * { touch-action: none; }
+[hidden] { display: none !important; }
+html, body { margin: 0; min-height: 100%; overflow-x: hidden; }
+body {
+  background: var(--paper); color: var(--ink); font-family: var(--body);
+  font-size: 16px; line-height: 1.5; -webkit-text-size-adjust: 100%;
+  user-select: none; -webkit-user-select: none; overscroll-behavior: none;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+.wrap {
+  max-width: 520px; margin: 0 auto; min-height: 100dvh;
+  padding: max(8px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  display: flex; flex-direction: column; gap: 8px;
+}
+.noren { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; margin: 0 -4px; }
+.noren span {
+  background: var(--noren); color: var(--noren-ink); font-family: var(--display);
+  text-align: center; font-size: 1.05rem; padding: 4px 0 8px; border-radius: 0 0 6px 6px; letter-spacing: .1em;
+}
+.hud { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.hud .stat { display: flex; flex-direction: column; line-height: 1.2; }
+.hud .stat small { font-size: .7rem; color: var(--muted); font-weight: 700; letter-spacing: .1em; }
+.hud .stat b { font-family: var(--display); font-weight: 400; font-size: 1.1rem; }
+.hearts { letter-spacing: 2px; font-size: 1rem; }
+.iconbtn { background: none; border: 2px solid var(--line); border-radius: 10px; width: 36px; height: 36px; font-size: 1rem; }
+
+/* カウンター */
+.counter {
+  background: linear-gradient(var(--wood), var(--wood-2)); border-radius: 14px; padding: 8px 8px 10px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; box-shadow: inset 0 -6px 0 rgba(0,0,0,.12);
+}
+.seat { display: flex; flex-direction: column; align-items: center; gap: 2px; min-height: 128px; justify-content: flex-end; position: relative; }
+.bubble {
+  background: var(--card); border: 2px solid var(--ink); border-radius: 12px; padding: 3px 6px 4px;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; position: relative; min-width: 92px;
+}
+.bubble::after { content: ""; position: absolute; bottom: -8px; left: 50%; translate: -50% 0; border: 7px solid transparent; border-top-color: var(--ink); border-bottom: 0; }
+.bubble .ord { display: flex; align-items: center; gap: 3px; font-weight: 900; font-size: .8rem; white-space: nowrap; }
+.bubble .ord svg { width: 13px; height: 36px; }
+.bubble .ord .x { font-family: var(--display); font-weight: 400; font-size: .75rem; color: var(--muted); }
+.pbar { width: 100%; height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; }
+.pbar i { display: block; height: 100%; width: 100%; background: var(--ok); border-radius: 3px; transform-origin: left; }
+.face { font-size: 1.9rem; line-height: 1; margin-top: 6px; }
+.seat.arrive .bubble, .seat.arrive .face { animation: arrive .4s cubic-bezier(.3,1.5,.5,1); }
+@keyframes arrive { from { opacity: 0; translate: 0 14px; } }
+.seat.happy .bubble { border-color: var(--ok); }
+.seat .msg { position: absolute; top: 0; left: 50%; translate: -50% 0; font-weight: 900; font-size: .85rem; white-space: nowrap; animation: floatup 1.2s ease-out forwards; pointer-events: none; }
+.seat .msg.good { color: var(--ok); }
+.seat .msg.bad { color: var(--bad); }
+@keyframes floatup { from { opacity: 1; translate: -50% 10px; } to { opacity: 0; translate: -50% -26px; } }
+.empty-seat { color: var(--muted); font-size: .75rem; opacity: .7; margin-bottom: 6px; }
+.queue { text-align: center; font-size: .72rem; color: var(--muted); margin-top: -4px; font-weight: 700; }
+.queue:empty { display: none; }
+/* お客さん：うしろの列（つぎに座る人） */
+.behind { display: flex; align-items: center; gap: 3px; background: rgba(255,255,255,.55); border: 1.5px dashed var(--muted); border-radius: 999px; padding: 1px 7px 1px 3px; margin-bottom: 2px; }
+:root[data-theme="dark"] .behind { background: rgba(0,0,0,.25); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .behind { background: rgba(0,0,0,.25); } }
+.behind .tag { font-size: .6rem; font-weight: 900; color: var(--noren); }
+.behind .nf { font-size: 1.05rem; line-height: 1; }
+.behind svg { width: 24px; height: 16px; }
+.behind .nn { font-size: .68rem; font-weight: 900; white-space: nowrap; }
+.behind.none { visibility: hidden; }
+/* 焼き台：つぎの段 */
+.nextrow { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; background: rgba(0,0,0,.4); border-radius: 6px; padding: 3px 0 2px; margin-bottom: 4px; position: relative; }
+.nextrow .lbl { position: absolute; left: -2px; top: -9px; font-size: .58rem; font-weight: 900; color: #fff; background: var(--noren); border-radius: 4px; padding: 0 4px; line-height: 1.4; z-index: 2; }
+.nextrow .ni { display: flex; justify-content: center; align-items: center; height: 20px; }
+.nextrow .ni svg { width: 28px; height: 19px; filter: saturate(.85); }
+.nextrow .ni.empty::after { content: ""; width: 10px; height: 2px; background: rgba(255,255,255,.25); border-radius: 1px; }
+.nextrow.last .ni { opacity: .9; }
+
+/* 焼き台 */
+.tip { text-align: center; font-size: .8rem; color: var(--muted); margin: 0; text-wrap: balance; }
+.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; align-content: start; flex: 1; touch-action: none; }
+.grill {
+  position: relative; background: var(--grill); border: 3px solid var(--grill-rim); border-radius: 10px;
+  padding: 6px 4px 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+  background-image:
+    linear-gradient(transparent 0 calc(100% - 3px), rgba(0,0,0,.25) 0),
+    repeating-linear-gradient(90deg, transparent 0 6px, var(--bar) 6px 8px);
+  box-shadow: inset 0 0 14px rgba(255,110,30,.28), 0 4px 0 var(--grill-rim);
+}
+.grill::before { content: ""; position: absolute; left: 8px; right: 8px; bottom: 6px; height: 14px; border-radius: 50%; background: var(--ember); filter: blur(8px); opacity: .35; pointer-events: none; }
+.grill.can { outline: 3px dashed rgba(255,170,60,.85); outline-offset: 2px; }
+.grill.hover { outline: 3px solid var(--ember); outline-offset: 2px; }
+.grill.done { animation: blaze .9s ease-in-out; }
+@keyframes blaze { 30%, 70% { box-shadow: inset 0 0 30px rgba(255,120,30,.9), 0 4px 0 var(--grill-rim); } }
+.layers { position: absolute; top: -9px; right: -6px; background: var(--card); color: var(--ink); border: 2px solid var(--grill-rim); border-radius: 999px; font-size: .68rem; font-weight: 900; padding: 0 6px; line-height: 1.5; z-index: 3; }
+.slot { height: var(--sh, 96px); display: flex; justify-content: center; align-items: stretch; position: relative; }
+.sk { width: 100%; max-width: 34px; position: relative; z-index: 1; transition: translate .15s ease-out; cursor: grab; }
+.sk svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.sk.sel { translate: 0 -10px; filter: drop-shadow(0 0 4px var(--ember)) drop-shadow(0 0 2px #fff); }
+.sk.dragging { opacity: .25; }
+.sk.pop { animation: popin .3s cubic-bezier(.3,1.6,.5,1); }
+@keyframes popin { from { scale: .4; opacity: 0; } }
+.sk.cook { animation: cook 1s forwards; }
+@keyframes cook { 60% { filter: brightness(.85) saturate(1.4) sepia(.3); translate: 0 0; opacity: 1; } 100% { filter: brightness(.85) saturate(1.4) sepia(.3); translate: 0 -40px; opacity: 0; } }
+.smoke { position: absolute; left: 50%; bottom: 30%; width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,.45); animation: smoke 1s ease-out infinite; z-index: 2; pointer-events: none; }
+@keyframes smoke { from { opacity: .8; translate: -50% 0; scale: .6; } to { opacity: 0; translate: -50% -60px; scale: 2.4; } }
+.ghost { position: fixed; z-index: 20; pointer-events: none; width: 34px; translate: -50% -60%; filter: drop-shadow(0 6px 6px rgba(0,0,0,.35)); }
+.ghost svg { width: 100%; height: 100%; display: block; }
+.shake { animation: shake .3s; }
+@keyframes shake { 25% { translate: -4px 0; } 75% { translate: 4px 0; } }
+
+.tray { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; min-height: 0; }
+.tray .dish { background: var(--card); border: 1.5px solid var(--line); border-radius: 999px; padding: 1px 8px; font-size: .72rem; display: flex; align-items: center; gap: 4px; }
+.tray .dish svg { width: 9px; height: 24px; }
+
+.controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.btn {
+  border: 2px solid var(--ink); background: var(--card); border-radius: 12px; padding: 8px 4px;
+  font-weight: 900; font-size: .88rem; box-shadow: 0 3px 0 var(--ink); line-height: 1.2;
+}
+.btn:active { translate: 0 2px; box-shadow: 0 1px 0 var(--ink); }
+.btn:disabled { opacity: .4; }
+.btn small { display: block; font-weight: 700; font-size: .7rem; color: var(--muted); }
+.btn.primary { background: var(--noren); color: var(--noren-ink); }
+
+.modal { position: fixed; inset: 0; background: rgba(20,10,5,.55); display: grid; place-items: center; padding: 16px; z-index: 30; }
+.sheet {
+  background: var(--card); border: 3px solid var(--ink); border-radius: 18px; padding: 22px 20px 18px; width: min(380px, 100%);
+  text-align: center; box-shadow: 0 8px 0 var(--ink); animation: arrive .35s cubic-bezier(.3,1.5,.5,1);
+}
+.sheet h2 { font-family: var(--display); font-weight: 400; font-size: 1.7rem; margin: 0 0 6px; color: var(--noren); }
+.sheet p { margin: 6px 0; }
+.sheet .big { font-family: var(--display); font-size: 2rem; }
+.sheet .rules { text-align: left; font-size: .88rem; color: var(--muted); padding-left: 1.2em; margin: 10px 0 14px; }
+.sheet .rules li { margin: 3px 0; }
+.sheet .btn { width: 100%; margin-top: 8px; padding: 12px; font-size: 1rem; }
+.menu { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 8px 0 2px; }
+.menu div { display: flex; flex-direction: column; align-items: center; font-size: .62rem; color: var(--muted); width: 38px; }
+.menu svg { width: 16px; height: 44px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="noren"><span>やき</span><span>とり</span><span>屋</span></div>
+  <div class="hud">
+    <div class="stat"><small>LEVEL</small><b id="lv">1</b></div>
+    <div class="stat"><small>売上</small><b id="money">¥0</b></div>
+    <div class="stat"><small>おきゃくさん</small><span class="hearts" id="hearts">❤❤❤</span></div>
+    <button class="iconbtn" id="mute" aria-label="音のオンオフ">🔊</button>
+  </div>
+  <div class="counter" id="counter"></div>
+  <div class="queue" id="queue"></div>
+  <p class="tip" id="tip"></p>
+  <div class="board" id="board"></div>
+  <div class="tray" id="tray"></div>
+  <div class="controls">
+    <button class="btn" id="shuffle">🔀 まぜる<small id="shuffleLeft">のこり2</small></button>
+    <button class="btn" id="extra">＋ 焼き台<small id="extraLeft">のこり1</small></button>
+    <button class="btn" id="retry">↻ やりなおし</button>
+  </div>
+</div>
+
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+
+<script>
+"use strict";
+const SLOTS = 3;
+const SEATS = 3;
+
+// 具（横長 60x40 の絵）
+const P = {
+  momo:     `<rect x="6" y="4" width="48" height="32" rx="12" fill="#E2A868"/><path d="M14 13h32M12 21h36M14 29h32" stroke="#9B5A26" stroke-width="3" stroke-linecap="round" opacity=".7"/><rect x="10" y="7" width="20" height="6" rx="3" fill="#fff" opacity=".35"/>`,
+  negi:     `<rect x="8" y="6" width="44" height="28" rx="6" fill="#F3EED2"/><rect x="8" y="6" width="9" height="28" rx="4" fill="#8FBF4D"/><rect x="43" y="6" width="9" height="28" rx="4" fill="#8FBF4D"/>`,
+  tsukune:  `<ellipse cx="30" cy="20" rx="25" ry="17" fill="#7A4628"/><ellipse cx="22" cy="12" rx="10" ry="4" fill="#fff" opacity=".28"/><circle cx="36" cy="25" r="1.8" fill="#3E2213"/><circle cx="24" cy="26" r="1.6" fill="#3E2213"/>`,
+  reba:     `<path d="M8 22c0-12 12-17 22-15 13 2 23 6 22 15-1 10-12 13-24 12C16 33 8 30 8 22z" fill="#6E2330"/><path d="M16 14c6-4 14-4 18-2" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".25" fill="none"/>`,
+  hatsu:    `<path d="M30 37C14 29 6 21 8 12c2-7 12-9 16-3 2 2 4 3 6 3s4-1 6-3c4-6 14-4 16 3 2 9-6 17-22 25z" fill="#C2483E"/><path d="M15 12c2-3 6-3 8-1" stroke="#fff" stroke-width="2.5" stroke-linecap="round" opacity=".35" fill="none"/>`,
+  shiitake: `<rect x="24" y="22" width="12" height="14" rx="4" fill="#EBDDC2"/><path d="M5 24C5 10 17 4 30 4s25 6 25 20c0 3-2 4-5 4H10c-3 0-5-1-5-4z" fill="#8A5634"/><path d="M22 10l16 10M38 10L22 20" stroke="#F3E6CC" stroke-width="3" stroke-linecap="round"/>`,
+  shishito: `<path d="M20 2c-6 8-9 20-7 32 1 4 4 5 6 3 6-8 9-20 7-32-1-4-4-5-6-3z" fill="#4E8B2C" transform="translate(8 0)"/><path d="M34 3c-6 8-9 20-7 32 1 4 4 5 6 3 6-8 9-20 7-32-1-4-4-5-6-3z" fill="#5E9E36"/>`,
+  uzura:    `<ellipse cx="30" cy="20" rx="19" ry="16" fill="#F6E7C4" stroke="#D8B97A" stroke-width="2"/><ellipse cx="24" cy="13" rx="7" ry="4" fill="#fff" opacity=".7"/>`,
+  tebasaki: `<path d="M6 16c4-9 20-12 34-9 10 2 15 7 14 13-1 7-9 11-22 12C16 33 3 26 6 16z" fill="#D18A3E"/><path d="M14 14c8-4 20-5 28-2" stroke="#F4C77E" stroke-width="3" stroke-linecap="round" fill="none"/>`,
+};
+// 串の種類：どの具が3つ刺さってるか（上→下）
+const KINDS = {
+  momo:     { name: "もも",     price: 540, p: ["momo", "momo", "momo"] },
+  negima:   { name: "ねぎま",   price: 600, p: ["momo", "negi", "momo"] },
+  tsukune:  { name: "つくね",   price: 660, p: ["tsukune", "tsukune", "tsukune"] },
+  shiitake: { name: "しいたけ", price: 480, p: ["shiitake", "shiitake", "shiitake"] },
+  reba:     { name: "レバー",   price: 570, p: ["reba", "reba", "reba"] },
+  uzura:    { name: "うずら",   price: 510, p: ["uzura", "uzura", "uzura"] },
+  hatsu:    { name: "ハツ",     price: 570, p: ["hatsu", "hatsu", "hatsu"] },
+  shishito: { name: "ししとう", price: 450, p: ["shishito", "shishito"] },
+  tebasaki: { name: "手羽先",   price: 690, p: ["tebasaki", "tebasaki"] },
+};
+const ICON = { momo: "momo", negima: "negi", tsukune: "tsukune", shiitake: "shiitake", reba: "reba", uzura: "uzura", hatsu: "hatsu", shishito: "shishito", tebasaki: "tebasaki" };
+const icon = k => `<svg viewBox="0 0 60 40" aria-hidden="true">${P[ICON[k]]}</svg>`;
+const KIND_ORDER = ["momo", "negima", "tsukune", "shiitake", "reba", "uzura", "hatsu", "shishito", "tebasaki"];
+const FACES = ["👨", "👩", "👴", "👵", "🧑", "👨‍🦰", "👩‍🦱", "🧔", "👱‍♀️", "👨‍🦳", "🧑‍🦱", "👩‍🦳"];
+
+// 縦の串（40x120）
+function skSVG(k) {
+  const ps = KINDS[k].p, n = ps.length, h = 30, top = 4 + (3 - n) * h / 2;
+  return `<svg viewBox="0 0 40 120" aria-hidden="true"><rect x="18.5" y="0" width="3" height="114" rx="1.5" fill="#E9CF9C"/><rect x="16" y="98" width="8" height="22" rx="2" fill="#D9BC86"/>`
+    + ps.map((p, i) => `<svg x="0" y="${top + i * h}" width="40" height="${h}" viewBox="0 0 60 40" overflow="visible">${P[p]}</svg>`).join("") + `</svg>`;
+}
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("yakitori:" + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("yakitori:" + k, JSON.stringify(v)); } catch {} },
+};
+
+// ---- 音 ----
+let actx = null, muted = store.get("muted", false);
+function ac() { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); return actx; }
+function tone(freq, dur = .08, type = "triangle", vol = .12, when = 0) {
+  if (muted) return;
+  try {
+    const a = ac(), t = a.currentTime + when, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+    o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02);
+  } catch {}
+}
+function sizzle() {
+  if (muted) return;
+  try {
+    const a = ac(), len = a.sampleRate * .9, buf = a.createBuffer(1, len, a.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (Math.random() < .3 ? 1 : .3) * (1 - i / len);
+    const src = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+    src.buffer = buf; f.type = "highpass"; f.frequency.value = 2500; g.gain.value = .07;
+    src.connect(f).connect(g).connect(a.destination); src.start();
+  } catch {}
+}
+const sfx = {
+  pick: () => tone(520, .06),
+  drop: () => tone(330, .08),
+  no: () => tone(140, .12, "square", .06),
+  pop: () => tone(700, .07, "sine", .1),
+  coin: () => { tone(988, .09, "square", .06); tone(1319, .18, "square", .06, .08); },
+  angry: () => { tone(220, .15, "sawtooth", .06); tone(180, .2, "sawtooth", .06, .12); },
+};
+const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+
+// ---- 状態 ----
+let S, L, uid = 0;
+const $ = id => document.getElementById(id);
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const pick = a => a[Math.random() * a.length | 0];
+const clone = x => JSON.parse(JSON.stringify(x));
+
+function levelSpec(n) {
+  const grills = Math.min(6 + 3 * Math.floor((n - 1) / 2), 12);   // 6,6,9,9,12...
+  const kinds = Math.min(3 + n, KIND_ORDER.length);                 // 4,5,6,...9
+  const sets = Math.min(1 + Math.floor(n / 2), 4);                  // 1種類あたり何皿（3本で1皿）
+  const empty = grills >= 9 ? 5 : 4;                                // 最初の空きスロット
+  const patience = Math.max(40, 80 - n * 4);
+  return { grills, kinds, sets, empty, patience };
+}
+
+function makeLayout(spec) {
+  const kinds = shuffle(KIND_ORDER.slice()).slice(0, spec.kinds);
+  const orders = kinds.flatMap(k => Array(spec.sets).fill(k));
+  for (let tries = 0; tries < 300; tries++) {
+    const items = shuffle(orders.flatMap(k => [k, k, k]));
+    const cap = spec.grills * SLOTS;
+    const vis = Math.min(items.length, cap - spec.empty);
+    const slots = shuffle(items.slice(0, vis).concat(Array(cap - vis).fill(null)));
+    const grills = [];
+    for (let g = 0; g < spec.grills; g++) grills.push({ slots: slots.slice(g * 3, g * 3 + 3), layers: [] });
+    if (grills.some(g => g.slots[0] && g.slots.every(s => s === g.slots[0]))) continue;
+    // 残りは焼き台の下に重ねる（1段2〜3本）
+    let rest = items.slice(vis), gi = 0;
+    const order = shuffle(grills.slice());
+    while (rest.length) {
+      const n = Math.min(rest.length, Math.random() < .6 ? 3 : 2);
+      const layer = shuffle(rest.splice(0, n).concat(Array(3 - n).fill(null)));
+      order[gi % order.length].layers.push(layer); gi++;
+    }
+    return { grills, orders };
+  }
+}
+
+function startGame() { S = { level: 1, money: 0, misses: 0 }; startLevel(); }
+
+function startLevel(retry = false) {
+  const spec = levelSpec(S.level), prev = L;
+  if (retry && prev) { L = { spec, layout: prev.layout, retryMoney: prev.retryMoney }; S.money = prev.retryMoney; }
+  else L = { spec, layout: makeLayout(spec), retryMoney: S.money };
+  const lay = clone(L.layout);
+  Object.assign(L, {
+    gen: ++uid, hasLayers: lay.grills.some(g => g.layers.length),
+    grills: lay.grills.map(g => ({ id: ++uid, slots: g.slots, layers: g.layers, busy: false })),
+    pool: lay.orders.slice(), lines: Array(SEATS).fill(null), tray: [], seats: Array(SEATS).fill(null),
+    nextArrive: [0.3, 1.8, 3.6], earned: 0, done: false, sel: null,
+    shuffleLeft: 2, extraLeft: 1,
+  });
+  $("tip").textContent = S.level === 1
+    ? "串をタップ（またはドラッグ）して別の焼き台へ。同じ串を3本そろえると焼けて注文に届くよ！"
+    : `LEVEL ${S.level}：串${spec.kinds}種類・${lay.orders.length}皿`;
+  $("board").innerHTML = ""; gEls.clear();
+  renderSeats(true); render(); fillQueue();
+}
+
+// ---- ルール ----
+const isFull3 = g => g.slots[0] && g.slots.every(s => s === g.slots[0]);
+const hasSpace = g => !g.busy && g.slots.includes(null);
+
+function moveSk(fromG, fromS, toG, toS) {
+  const A = L.grills[fromG], B = L.grills[toG];
+  if (!A || !B || A.busy || B.busy || !A.slots[fromS]) return false;
+  if (toS == null || B.slots[toS]) toS = B.slots.indexOf(null);
+  if (toS < 0 || (fromG === toG && fromS === toS)) return false;
+  B.slots[toS] = A.slots[fromS]; A.slots[fromS] = null;
+  L.sel = null; sfx.drop();
+  popIn.add(B.id + ":" + toS);
+  if (isFull3(B)) cookGrill(B);
+  if (fromG !== toG) refill(A);
+  render(); checkStuck();
+  return true;
+}
+
+function refill(g) {
+  if (g.busy || g.slots.some(Boolean) || !g.layers.length) return;
+  g.slots = g.layers.shift();
+  g.slots.forEach((s, i) => s && popIn.add(g.id + ":" + i));
+  sfx.pop();
+  if (isFull3(g)) cookGrill(g);
+}
+
+function cookGrill(g) {
+  g.busy = true; sizzle(); buzz(30);
+  const kind = g.slots[0], gen = L.gen;
+  cooking.add(g.id);
+  setTimeout(() => {
+    if (L.gen !== gen) return;
+    g.slots = [null, null, null]; g.busy = false; cooking.delete(g.id);
+    deliver(kind); refill(g); render(); checkStuck(); checkClear();
+  }, 1050);
+}
+
+function checkStuck() {
+  if (L.done || L.grills.some(g => g.busy)) return;
+  if (L.grills.some(hasSpace)) return;
+  if (!L.grills.some(g => g.slots.some(Boolean))) return;
+  setTimeout(() => { if (!L.done && !L.grills.some(hasSpace) && !L.grills.some(g => g.busy)) showModal("stuck"); }, 400);
+}
+
+function doShuffle() {
+  if (L.shuffleLeft <= 0 || L.done || L.grills.some(g => g.busy)) return;
+  L.shuffleLeft--;
+  const all = L.grills.flatMap(g => g.slots);
+  for (let t = 0; t < 50; t++) {
+    shuffle(all);
+    const ok = L.grills.every((g, i) => { const s = all.slice(i * 3, i * 3 + 3); return !(s[0] && s.every(x => x === s[0])); });
+    if (ok || t === 49) break;
+  }
+  L.grills.forEach((g, i) => { g.slots = all.slice(i * 3, i * 3 + 3); g.slots.forEach((s, j) => s && popIn.add(g.id + ":" + j)); });
+  L.sel = null; sfx.pop(); render();
+}
+function addGrill() {
+  if (L.extraLeft <= 0 || L.done) return;
+  L.extraLeft--; L.grills.push({ id: ++uid, slots: [null, null, null], layers: [], busy: false }); sfx.pop(); render();
+}
+
+// ---- お客さん ----
+function deliver(kind) {
+  let best = -1;
+  L.seats.forEach((c, i) => { if (c && !c.leaving && c.kind === kind && (best < 0 || c.left < L.seats[best].left)) best = i; });
+  if (best >= 0) serve(best); else { L.tray.push(kind); renderTray(); }
+}
+function serve(i) {
+  const c = L.seats[i], price = KINDS[c.kind].price;
+  const tip = Math.round(price * 0.5 * (c.left / c.max) / 10) * 10;
+  S.money += price + tip; L.earned += price + tip;
+  sfx.coin(); buzz(20);
+  c.leaving = "happy"; c.msg = tip > 0 ? `+¥${price} チップ¥${tip}` : `+¥${price}`;
+  renderSeats(); renderHud();
+  const gen = L.gen;
+  setTimeout(() => { if (L.gen !== gen) return; L.seats[i] = null; L.nextArrive[i] = .8 + Math.random(); renderSeats(); checkClear(); }, 1100);
+}
+// 各席のうしろに、つぎに座るお客さんが1人ずつ並ぶ
+function pickKind() {
+  let kind = L.tray.find(k => L.pool.includes(k) && !L.lines.some(q => q && q.kind === k));
+  if (kind) return kind;
+  // 焼き台に見えてる本数が多い串ほど注文されやすい
+  const vis = {};
+  L.grills.forEach(g => g.slots.forEach(s => s && (vis[s] = (vis[s] || 0) + 1)));
+  L.seats.forEach(c => c && !c.leaving && (vis[c.kind] = (vis[c.kind] || 0) - 3));
+  L.lines.forEach(q => q && (vis[q.kind] = (vis[q.kind] || 0) - 3));
+  const w = L.pool.map(k => .3 + Math.max(0, vis[k] || 0) ** 2);
+  let r = Math.random() * w.reduce((a, b) => a + b, 0);
+  return L.pool[w.findIndex(x => (r -= x) < 0)] || pick(L.pool);
+}
+function fillQueue() {
+  for (let i = 0; i < SEATS; i++) {
+    if (L.lines[i] || !L.pool.length) continue;
+    const kind = pickKind();
+    L.pool.splice(L.pool.indexOf(kind), 1);
+    L.lines[i] = { kind, face: pick(FACES) };
+  }
+  renderSeats(); renderQueue();
+}
+function arrive(i) {
+  if (!L.lines[i]) fillQueue();
+  let from = i;
+  if (!L.lines[i]) from = L.lines.findIndex(Boolean); // 自分の列が空なら、ほかの列の人が座る
+  if (from < 0) return;
+  const q = L.lines[from]; L.lines[from] = null;
+  const max = L.spec.patience * (.85 + Math.random() * .3);
+  L.seats[i] = { kind: q.kind, max, left: max, face: q.face, fresh: true };
+  fillQueue();
+  const t = L.tray.indexOf(q.kind);
+  if (t >= 0) { L.tray.splice(t, 1); renderTray(); const gen = L.gen; setTimeout(() => L.gen === gen && L.seats[i] && !L.seats[i].leaving && serve(i), 500); }
+}
+function timeout(i) {
+  const c = L.seats[i];
+  c.leaving = "angry"; c.msg = "おそい！"; L.pool.push(c.kind); fillQueue();
+  S.misses++; sfx.angry(); buzz([60, 40, 60]);
+  renderSeats(); renderHud(); renderQueue();
+  const gen = L.gen;
+  setTimeout(() => {
+    if (L.gen !== gen) return;
+    L.seats[i] = null; L.nextArrive[i] = 1.5 + Math.random(); renderSeats();
+    if (S.misses >= 3) gameOver();
+  }, 1100);
+}
+function checkClear() {
+  if (L.done) return;
+  const left = L.grills.some(g => g.slots.some(Boolean) || g.layers.length || g.busy);
+  if (!left && !L.pool.length && L.lines.every(q => !q) && !L.tray.length && L.seats.every(s => !s)) {
+    L.done = true; saveBest(S.level);
+    setTimeout(() => showModal("clear"), 300);
+  }
+}
+function saveBest(level) {
+  const best = store.get("best", { level: 0, money: 0 });
+  store.set("best", { level: Math.max(best.level, level), money: Math.max(best.money, S.money) });
+}
+function gameOver() { if (L.done) return; L.done = true; saveBest(S.level - 1); showModal("over"); }
+
+// ---- 描画 ----
+const gEls = new Map(), popIn = new Set(), cooking = new Set();
+function render() {
+  const board = $("board");
+  const rows = Math.ceil(L.grills.length / 3);
+  // 画面に収まるように串の高さを決める
+  const used = board.getBoundingClientRect().top + window.scrollY;
+  const availH = window.innerHeight - used - 110;
+  const colW = (board.clientWidth - 16) / 3;
+  const sh = Math.max(64, Math.min(110, Math.floor(availH / rows) - (L.hasLayers ? 56 : 26), Math.floor(colW / 3 * 2.9)));
+  board.style.setProperty("--sh", sh + "px");
+
+  L.grills.forEach((g, gi) => {
+    let el = gEls.get(g.id);
+    if (!el) {
+      el = document.createElement("div"); el.className = "grill"; el.dataset.id = g.id;
+      gEls.set(g.id, el); board.appendChild(el);
+    }
+    const sig = g.slots.join(",") + "|" + (g.layers[0] || []).join(",") + g.layers.length + "|" + g.busy;
+    if (el.dataset.sig !== sig || [...popIn].some(k => k.startsWith(g.id + ":"))) {
+      const nx = g.layers[0];
+      const strip = !L.hasLayers ? "" : `<div class="nextrow">${nx ? `<span class="lbl">つぎ${g.layers.length > 1 ? `（あと${g.layers.length}段）` : ""}</span>` : ""}`
+        + [0, 1, 2].map(si => nx && nx[si] ? `<div class="ni">${icon(nx[si])}</div>` : `<div class="ni empty"></div>`).join("") + `</div>`;
+      el.innerHTML = strip + g.slots.map((k, si) => {
+        if (!k) return `<div class="slot" data-s="${si}"></div>`;
+        const key = g.id + ":" + si, pop = popIn.has(key); popIn.delete(key);
+        return `<div class="slot" data-s="${si}"><div class="sk${pop ? " pop" : ""}${g.busy ? " cook" : ""}" data-s="${si}" aria-label="${KINDS[k].name}">${skSVG(k)}</div>${g.busy && si === 1 ? `<span class="smoke"></span><span class="smoke" style="animation-delay:.35s;margin-left:-12px"></span><span class="smoke" style="animation-delay:.7s;margin-left:12px"></span>` : ""}</div>`;
+      }).join("");
+      el.dataset.sig = sig;
+      if (g.busy) { el.classList.remove("done"); void el.offsetWidth; el.classList.add("done"); }
+    }
+    const selHere = L.sel && L.sel.g === gi;
+    el.querySelectorAll(".sk").forEach(s => s.classList.toggle("sel", !!selHere && +s.dataset.s === L.sel.s));
+    el.classList.toggle("can", !!L.sel && !selHere && hasSpace(g));
+  });
+  $("shuffle").disabled = L.shuffleLeft <= 0;
+  $("shuffleLeft").textContent = `のこり${L.shuffleLeft}`;
+  $("extra").disabled = L.extraLeft <= 0;
+  $("extraLeft").textContent = `のこり${L.extraLeft}`;
+  renderHud(); renderTray(); renderQueue();
+}
+function renderHud() {
+  $("lv").textContent = S.level;
+  $("money").textContent = "¥" + S.money.toLocaleString();
+  $("hearts").textContent = "❤".repeat(Math.max(0, 3 - S.misses)) + "♡".repeat(Math.min(3, S.misses));
+}
+function renderTray() {
+  $("tray").innerHTML = L.tray.map(k => `<span class="dish">${skSVG(k)}${KINDS[k].name}×3 焼けてます</span>`).join("");
+}
+function renderQueue() {
+  const rest = L.pool.length;
+  $("queue").textContent = rest ? `うしろにまだ ${rest}人 ならんでるよ` : "";
+}
+const seatEls = [];
+function renderSeats(init) {
+  const counter = $("counter");
+  if (init || !seatEls.length) {
+    counter.innerHTML = ""; seatEls.length = 0;
+    for (let i = 0; i < SEATS; i++) { const d = document.createElement("div"); d.className = "seat"; counter.appendChild(d); seatEls.push(d); }
+  }
+  L.seats.forEach((c, i) => {
+    const d = seatEls[i];
+    const q = L.lines[i];
+    const sig = (c ? `${c.face}${c.kind}${c.leaving || ""}` : "empty") + "/" + (q ? q.face + q.kind : "");
+    if (d.dataset.sig === sig) return;
+    d.dataset.sig = sig;
+    d.className = "seat" + (c && c.fresh ? " arrive" : "") + (c && c.leaving === "happy" ? " happy" : "");
+    if (c) c.fresh = false;
+    const back = q ? `<div class="behind"><span class="tag">つぎ</span><span class="nf">${q.face}</span>${icon(q.kind)}<span class="nn">${KINDS[q.kind].name}</span></div>` : `<div class="behind none">&nbsp;</div>`;
+    if (!c) { d.innerHTML = back + `<div class="empty-seat">空席</div><div class="face" style="opacity:.25">🪑</div>`; return; }
+    const face = c.leaving === "happy" ? "😋" : c.leaving === "angry" ? "😠" : c.face;
+    const s = skSVG(c.kind);
+    d.innerHTML = back + `<div class="bubble"><div class="ord">${s}${s}${s}<span>${KINDS[c.kind].name}<br><span class="x">×3本</span></span></div><div class="pbar"><i></i></div></div>
+      <div class="face">${face}</div>${c.msg ? `<div class="msg ${c.leaving === "happy" ? "good" : "bad"}">${c.msg}</div>` : ""}`;
+    c.bar = d.querySelector(".pbar i"); updateBar(c);
+  });
+}
+function updateBar(c) {
+  if (!c.bar) return;
+  const r = Math.max(0, c.left / c.max);
+  c.bar.style.transform = `scaleX(${r})`;
+  c.bar.style.background = r > .5 ? "var(--ok)" : r > .25 ? "#E0A020" : "var(--bad)";
+}
+
+// ---- 操作（タップ／ドラッグ） ----
+let drag = null;
+const gIndexOf = el => L.grills.findIndex(g => g.id === +el.dataset.id);
+function grillAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return el && el.closest(".grill");
+}
+$("board").addEventListener("pointerdown", e => {
+  if (!L || L.done) return;
+  const gEl = e.target.closest(".grill"); if (!gEl) return;
+  const gi = gIndexOf(gEl), g = L.grills[gi];
+  const skEl = e.target.closest(".sk");
+  const slotEl = e.target.closest(".slot");
+  drag = { x: e.clientX, y: e.clientY, gi, si: skEl ? +skEl.dataset.s : null, slot: slotEl ? +slotEl.dataset.s : null, moved: false, ghost: null, skEl, id: e.pointerId };
+  if (skEl && !g.busy) { try { $("board").setPointerCapture(e.pointerId); } catch {} }
+});
+$("board").addEventListener("pointermove", e => {
+  if (!drag || drag.si == null || drag.id !== e.pointerId) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 8) {
+    if (L.grills[drag.gi].busy) return;
+    drag.moved = true; L.sel = { g: drag.gi, s: drag.si }; sfx.pick();
+    const k = L.grills[drag.gi].slots[drag.si];
+    drag.ghost = document.createElement("div"); drag.ghost.className = "ghost";
+    drag.ghost.style.height = getComputedStyle($("board")).getPropertyValue("--sh");
+    drag.ghost.innerHTML = skSVG(k); document.body.appendChild(drag.ghost);
+    render(); const sk = gEls.get(L.grills[drag.gi].id).querySelector(`.sk[data-s="${drag.si}"]`); sk && sk.classList.add("dragging");
+  }
+  if (drag.moved) {
+    drag.ghost.style.left = e.clientX + "px"; drag.ghost.style.top = e.clientY + "px";
+    const t = grillAt(e.clientX, e.clientY);
+    gEls.forEach(el => el.classList.toggle("hover", el === t));
+  }
+});
+function endDrag(e) {
+  if (!drag || drag.id !== e.pointerId) return;
+  const d = drag; drag = null;
+  gEls.forEach(el => el.classList.remove("hover"));
+  if (d.moved) {
+    d.ghost.remove();
+    const t = grillAt(e.clientX, e.clientY);
+    const ti = t ? gIndexOf(t) : -1;
+    let slot = null;
+    if (t) { const s = document.elementFromPoint(e.clientX, e.clientY)?.closest(".slot"); if (s) slot = +s.dataset.s; }
+    if (ti < 0 || ti === d.gi || !moveSk(d.gi, d.si, ti, slot)) {
+      if (ti >= 0 && ti !== d.gi) { sfx.no(); shakeEl(t); }
+      L.sel = null; render();
+    }
+    return;
+  }
+  tap(d.gi, d.si, d.slot);
+}
+$("board").addEventListener("pointerup", endDrag);
+$("board").addEventListener("pointercancel", e => { if (drag && drag.ghost) drag.ghost.remove(); drag = null; L && (L.sel = null, render()); });
+
+function tap(gi, si, slot) {
+  const g = L.grills[gi];
+  if (L.sel) {
+    const { g: fg, s: fs } = L.sel;
+    if (fg === gi && fs === si) { L.sel = null; render(); return; }
+    if (fg !== gi) {
+      if (hasSpace(g)) { moveSk(fg, fs, gi, si == null ? slot : null); return; }
+      if (si != null && !g.busy) { L.sel = { g: gi, s: si }; sfx.pick(); render(); return; }
+      sfx.no(); shakeEl(gEls.get(g.id)); L.sel = null; render(); return;
+    }
+    if (si != null) { L.sel = { g: gi, s: si }; sfx.pick(); render(); return; }
+    // 同じ焼き台の空きに動かす
+    moveSk(fg, fs, gi, slot); return;
+  }
+  if (si != null && !g.busy) { L.sel = { g: gi, s: si }; sfx.pick(); render(); }
+}
+function shakeEl(el) { if (!el) return; el.classList.remove("shake"); void el.offsetWidth; el.classList.add("shake"); }
+
+// ---- ループ ----
+let last = performance.now(), paused = true;
+function loop(now) {
+  const dt = Math.min(.1, (now - last) / 1000); last = now;
+  if (!paused && L && !L.done) {
+    L.seats.forEach((c, i) => {
+      if (!c) { L.nextArrive[i] -= dt; if (L.nextArrive[i] <= 0 && (L.lines.some(Boolean) || L.pool.length)) arrive(i); return; }
+      if (c.leaving) return;
+      c.left -= dt; updateBar(c);
+      if (c.left <= 0) timeout(i);
+    });
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+document.addEventListener("visibilitychange", () => { if (document.hidden && L && !L.done && $("modal").hidden) showModal("pause"); });
+
+// ---- モーダル ----
+function showModal(type) {
+  paused = true;
+  const sheet = $("sheet"), best = store.get("best", { level: 0, money: 0 });
+  const menu = `<div class="menu">${KIND_ORDER.map(k => `<div>${skSVG(k)}${KINDS[k].name}</div>`).join("")}</div>`;
+  if (type === "title") {
+    sheet.innerHTML = `<h2>やきとり ならべ</h2><p>焼き台の串をならべかえて、注文の串を焼こう！</p>${menu}
+      <ul class="rules">
+        <li>串をタップして別の焼き台をタップ（ドラッグでもOK）で、空いてる場所へうつせる</li>
+        <li>ひとつの焼き台に同じ串が3本そろうと焼けて、注文したお客さんに届く</li>
+        <li>焼き台の上の「つぎ」に、その焼き台が空になったら出てくる串が見える</li>
+        <li>お客さんのうしろの「つぎ」が、次にその席に座る人の注文</li>
+        <li>早く届けるほどチップが多い。3人おこらせると閉店…</li>
+      </ul>
+      ${best.level ? `<p style="font-size:.85rem;color:var(--muted)">さいこう記録：LEVEL ${best.level} ／ ¥${best.money.toLocaleString()}</p>` : ""}
+      <button class="btn primary" id="go">開店する</button>`;
+    $("go").onclick = () => { hideModal(); startGame(); };
+  } else if (type === "clear") {
+    sheet.innerHTML = `<h2>まいど！</h2><p>LEVEL ${S.level} クリア</p>
+      <p class="big">+¥${L.earned.toLocaleString()}</p><p style="color:var(--muted)">売上 ¥${S.money.toLocaleString()}</p>
+      <button class="btn primary" id="go">つぎのお客さんへ</button>`;
+    $("go").onclick = () => { hideModal(); S.level++; startLevel(); };
+  } else if (type === "over") {
+    sheet.innerHTML = `<h2>本日閉店…</h2><p>お客さんを3人おこらせちゃった</p>
+      <p class="big">LEVEL ${S.level}</p><p>売上 ¥${S.money.toLocaleString()}</p>
+      <button class="btn primary" id="go">このレベルからやりなおす</button><button class="btn" id="title">さいしょから</button>`;
+    $("go").onclick = () => { hideModal(); S.misses = 0; startLevel(true); };
+    $("title").onclick = () => showModal("title");
+  } else if (type === "stuck") {
+    const canShuffle = L.shuffleLeft > 0, canExtra = L.extraLeft > 0;
+    sheet.innerHTML = `<h2>焼き台がいっぱい！</h2><p>空いてる場所がなくなっちゃった</p>
+      ${canExtra ? `<button class="btn primary" id="a1">＋ 焼き台をふやす</button>` : ""}
+      ${canShuffle ? `<button class="btn ${canExtra ? "" : "primary"}" id="a2">🔀 串をまぜる</button>` : ""}
+      <button class="btn" id="a3">↻ このレベルをやりなおす</button>`;
+    if (canExtra) $("a1").onclick = () => { hideModal(); addGrill(); };
+    if (canShuffle) $("a2").onclick = () => { hideModal(); doShuffle(); checkStuck(); };
+    $("a3").onclick = () => { hideModal(); startLevel(true); };
+  } else if (type === "pause") {
+    sheet.innerHTML = `<h2>ひと休み</h2><p>お客さんは待っててくれてるよ</p><button class="btn primary" id="go">再開</button>`;
+    $("go").onclick = hideModal;
+  } else if (type === "retry") {
+    sheet.innerHTML = `<h2>やりなおす？</h2><p>このレベルを最初の並びからやりなおすよ（売上もレベル開始時にもどる）</p>
+      <button class="btn primary" id="go">やりなおす</button><button class="btn" id="no">つづける</button>`;
+    $("go").onclick = () => { hideModal(); startLevel(true); };
+    $("no").onclick = hideModal;
+  }
+  $("modal").hidden = false;
+}
+function hideModal() { $("modal").hidden = true; paused = false; last = performance.now(); }
+
+// ピンチやダブルタップで画面が拡大されないように
+["gesturestart", "gesturechange"].forEach(t => document.addEventListener(t, e => e.preventDefault(), { passive: false }));
+document.addEventListener("dblclick", e => e.preventDefault(), { passive: false });
+document.addEventListener("touchmove", e => { if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive: false });
+
+$("shuffle").onclick = () => { doShuffle(); };
+$("extra").onclick = addGrill;
+$("retry").onclick = () => L && !L.done && showModal("retry");
+$("mute").textContent = muted ? "🔇" : "🔊";
+$("mute").onclick = () => { muted = !muted; store.set("muted", muted); $("mute").textContent = muted ? "🔇" : "🔊"; };
+window.addEventListener("resize", () => L && render());
+
+showModal("title");
+
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
