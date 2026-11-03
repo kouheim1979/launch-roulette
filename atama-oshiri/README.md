@@ -13,7 +13,7 @@
 ## 公開（GitHub Pages）
 
 `main` に push すると `.github/workflows/atama-oshiri-pages.yml` が `atama-oshiri/` を GitHub Pages の `/launch-roulette/atama-oshiri/` に公開します（トップの `/launch-roulette/` はゲームへ自動で移動します）。
-初回だけ、リポジトリの Settings → Pages → Build and deployment の Source を「GitHub Actions」にしてください。
+サイトは `gh-pages` ブランチに置かれ、GitHub Pages はそこから配信されます（Settings → Pages の Source が「Deploy from a branch: gh-pages / (root)」になっていること）。
 
 公開先: `https://kouheim1979.github.io/launch-roulette/atama-oshiri/`
 
