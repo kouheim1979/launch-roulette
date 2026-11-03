@@ -99,7 +99,18 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .seat .msg.bad { color: var(--bad); }
 @keyframes floatup { from { opacity: 1; translate: -50% 10px; } to { opacity: 0; translate: -50% -26px; } }
 .empty-seat { color: var(--muted); font-size: .75rem; opacity: .7; margin-bottom: 6px; }
-.queue { text-align: center; font-size: .75rem; color: var(--muted); margin-top: -4px; }
+.queue { display: flex; align-items: center; gap: 4px; min-height: 0; margin-top: -2px; overflow: hidden; }
+.queue:empty { display: none; }
+.qlabel { font-family: var(--display); font-size: .75rem; color: var(--noren); writing-mode: vertical-rl; letter-spacing: .1em; }
+.qc { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; background: var(--card); border: 1.5px solid var(--line); border-radius: 10px; padding: 2px 4px; opacity: .8; }
+.qc.first { opacity: 1; border-color: var(--ink); }
+.qf { font-size: 1.1rem; line-height: 1; }
+.qc svg { width: 9px; height: 26px; flex: none; }
+.qn { font-size: .66rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qrest { font-size: .7rem; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.slot .next { position: absolute; inset: 0; display: flex; justify-content: center; pointer-events: none; translate: 22% -10px; }
+.slot .next .ns { width: 100%; max-width: 34px; filter: brightness(.45) saturate(.5); opacity: .9; }
+.slot .next .ns svg { width: 100%; height: 100%; display: block; }
 
 /* 焼き台 */
 .tip { text-align: center; font-size: .8rem; color: var(--muted); margin: 0; text-wrap: balance; }
@@ -312,7 +323,7 @@ function startLevel(retry = false) {
   Object.assign(L, {
     gen: ++uid,
     grills: lay.grills.map(g => ({ id: ++uid, slots: g.slots, layers: g.layers, busy: false })),
-    pool: lay.orders.slice(), tray: [], seats: Array(SEATS).fill(null),
+    pool: lay.orders.slice(), queue: [], tray: [], seats: Array(SEATS).fill(null),
     nextArrive: [0.3, 1.8, 3.6], earned: 0, done: false, sel: null,
     shuffleLeft: 2, extraLeft: 1,
   });
@@ -320,7 +331,7 @@ function startLevel(retry = false) {
     ? "串をタップ（またはドラッグ）して別の焼き台へ。同じ串を3本そろえると焼けて注文に届くよ！"
     : `LEVEL ${S.level}：串${spec.kinds}種類・${lay.orders.length}皿`;
   $("board").innerHTML = ""; gEls.clear();
-  render(); renderSeats(true);
+  render(); fillQueue(); renderSeats(true);
 }
 
 // ---- ルール ----
@@ -400,29 +411,38 @@ function serve(i) {
   const gen = L.gen;
   setTimeout(() => { if (L.gen !== gen) return; L.seats[i] = null; L.nextArrive[i] = .8 + Math.random(); renderSeats(); checkClear(); }, 1100);
 }
-function arrive(i) {
-  if (!L.pool.length) return;
-  const trayKind = L.tray.find(k => L.pool.includes(k));
-  // 焼き台に見えてる本数が多い串ほど注文されやすい（埋もれてる串ばかり頼まれないように）
-  let kind = trayKind;
-  if (!kind) {
-    const vis = {};
-    L.grills.forEach(g => g.slots.forEach(s => s && (vis[s] = (vis[s] || 0) + 1)));
-    L.seats.forEach(c => c && !c.leaving && (vis[c.kind] = Math.max(0, (vis[c.kind] || 0) - 3)));
-    const w = L.pool.map(k => .3 + (vis[k] || 0) ** 2);
-    let r = Math.random() * w.reduce((a, b) => a + b, 0);
-    kind = L.pool[w.findIndex(x => (r -= x) < 0)] || pick(L.pool);
+const QUEUE = 3; // 先まで見えるお客さんの人数
+function fillQueue() {
+  while (L.queue.length < QUEUE && L.pool.length) {
+    // 焼けて待ってる皿 → 焼き台に見えてる本数が多い串、の順で注文されやすい
+    let kind = L.tray.find(k => L.pool.includes(k) && !L.queue.some(q => q.kind === k));
+    if (!kind) {
+      const vis = {};
+      L.grills.forEach(g => g.slots.forEach(s => s && (vis[s] = (vis[s] || 0) + 1)));
+      L.seats.forEach(c => c && !c.leaving && (vis[c.kind] = (vis[c.kind] || 0) - 3));
+      L.queue.forEach(q => (vis[q.kind] = (vis[q.kind] || 0) - 3));
+      const w = L.pool.map(k => .3 + Math.max(0, vis[k] || 0) ** 2);
+      let r = Math.random() * w.reduce((a, b) => a + b, 0);
+      kind = L.pool[w.findIndex(x => (r -= x) < 0)] || pick(L.pool);
+    }
+    L.pool.splice(L.pool.indexOf(kind), 1);
+    L.queue.push({ kind, face: pick(FACES), id: ++uid });
   }
-  L.pool.splice(L.pool.indexOf(kind), 1);
+  renderQueue();
+}
+function arrive(i) {
+  if (!L.queue.length) fillQueue();
+  const q = L.queue.shift();
+  if (!q) return;
   const max = L.spec.patience * (.85 + Math.random() * .3);
-  L.seats[i] = { kind, max, left: max, face: pick(FACES), fresh: true };
-  renderSeats(); renderQueue();
-  const t = L.tray.indexOf(kind);
+  L.seats[i] = { kind: q.kind, max, left: max, face: q.face, fresh: true };
+  fillQueue(); renderSeats();
+  const t = L.tray.indexOf(q.kind);
   if (t >= 0) { L.tray.splice(t, 1); renderTray(); const gen = L.gen; setTimeout(() => L.gen === gen && L.seats[i] && !L.seats[i].leaving && serve(i), 500); }
 }
 function timeout(i) {
   const c = L.seats[i];
-  c.leaving = "angry"; c.msg = "おそい！"; L.pool.push(c.kind);
+  c.leaving = "angry"; c.msg = "おそい！"; L.pool.push(c.kind); fillQueue();
   S.misses++; sfx.angry(); buzz([60, 40, 60]);
   renderSeats(); renderHud(); renderQueue();
   const gen = L.gen;
@@ -435,7 +455,7 @@ function timeout(i) {
 function checkClear() {
   if (L.done) return;
   const left = L.grills.some(g => g.slots.some(Boolean) || g.layers.length || g.busy);
-  if (!left && !L.pool.length && !L.tray.length && L.seats.every(s => !s)) {
+  if (!left && !L.pool.length && !L.queue.length && !L.tray.length && L.seats.every(s => !s)) {
     L.done = true; saveBest(S.level);
     setTimeout(() => showModal("clear"), 300);
   }
@@ -464,12 +484,14 @@ function render() {
       el = document.createElement("div"); el.className = "grill"; el.dataset.id = g.id;
       gEls.set(g.id, el); board.appendChild(el);
     }
-    const sig = g.slots.join(",") + "|" + g.layers.length + "|" + g.busy;
+    const sig = g.slots.join(",") + "|" + (g.layers[0] || []).join(",") + g.layers.length + "|" + g.busy;
     if (el.dataset.sig !== sig || [...popIn].some(k => k.startsWith(g.id + ":"))) {
+      const nx = g.layers[0] || [];
+      const under = si => nx[si] ? `<div class="next"><div class="ns">${skSVG(nx[si])}</div></div>` : "";
       el.innerHTML = g.slots.map((k, si) => {
-        if (!k) return `<div class="slot" data-s="${si}"></div>`;
+        if (!k) return `<div class="slot" data-s="${si}">${under(si)}</div>`;
         const key = g.id + ":" + si, pop = popIn.has(key); popIn.delete(key);
-        return `<div class="slot" data-s="${si}"><div class="sk${pop ? " pop" : ""}${g.busy ? " cook" : ""}" data-s="${si}" aria-label="${KINDS[k].name}">${skSVG(k)}</div>${g.busy && si === 1 ? `<span class="smoke"></span><span class="smoke" style="animation-delay:.35s;margin-left:-12px"></span><span class="smoke" style="animation-delay:.7s;margin-left:12px"></span>` : ""}</div>`;
+        return `<div class="slot" data-s="${si}">${under(si)}<div class="sk${pop ? " pop" : ""}${g.busy ? " cook" : ""}" data-s="${si}" aria-label="${KINDS[k].name}">${skSVG(k)}</div>${g.busy && si === 1 ? `<span class="smoke"></span><span class="smoke" style="animation-delay:.35s;margin-left:-12px"></span><span class="smoke" style="animation-delay:.7s;margin-left:12px"></span>` : ""}</div>`;
       }).join("") + (g.layers.length ? `<span class="layers">あと${g.layers.length}段</span>` : "");
       el.dataset.sig = sig;
       if (g.busy) { el.classList.remove("done"); void el.offsetWidth; el.classList.add("done"); }
@@ -493,8 +515,11 @@ function renderTray() {
   $("tray").innerHTML = L.tray.map(k => `<span class="dish">${skSVG(k)}${KINDS[k].name}×3 焼けてます</span>`).join("");
 }
 function renderQueue() {
-  const n = L.pool.length;
-  $("queue").textContent = n ? `ならんでるお客さん あと${n}人` : "";
+  const rest = L.pool.length;
+  $("queue").innerHTML = L.queue.length
+    ? `<span class="qlabel">つぎ</span>` + L.queue.map((q, i) => `<span class="qc${i === 0 ? " first" : ""}"><span class="qf">${q.face}</span>${skSVG(q.kind)}<span class="qn">${KINDS[q.kind].name}</span></span>`).join("")
+      + (rest ? `<span class="qrest">+${rest}人</span>` : "")
+    : "";
 }
 const seatEls = [];
 function renderSeats(init) {
@@ -603,7 +628,7 @@ function loop(now) {
   const dt = Math.min(.1, (now - last) / 1000); last = now;
   if (!paused && L && !L.done) {
     L.seats.forEach((c, i) => {
-      if (!c) { L.nextArrive[i] -= dt; if (L.nextArrive[i] <= 0 && L.pool.length) arrive(i); return; }
+      if (!c) { L.nextArrive[i] -= dt; if (L.nextArrive[i] <= 0 && (L.queue.length || L.pool.length)) arrive(i); return; }
       if (c.leaving) return;
       c.left -= dt; updateBar(c);
       if (c.left <= 0) timeout(i);
@@ -624,7 +649,8 @@ function showModal(type) {
       <ul class="rules">
         <li>串をタップして別の焼き台をタップ（ドラッグでもOK）で、空いてる場所へうつせる</li>
         <li>ひとつの焼き台に同じ串が3本そろうと焼けて、注文したお客さんに届く</li>
-        <li>焼き台が空になると、下に重なってる串（あと○段）が出てくる</li>
+        <li>焼き台が空になると、うしろに暗く見えてる串（つぎの段）が出てくる</li>
+        <li>「つぎ」の列に、次に来るお客さんの注文が見える</li>
         <li>早く届けるほどチップが多い。3人おこらせると閉店…</li>
       </ul>
       ${best.level ? `<p style="font-size:.85rem;color:var(--muted)">さいこう記録：LEVEL ${best.level} ／ ¥${best.money.toLocaleString()}</p>` : ""}
