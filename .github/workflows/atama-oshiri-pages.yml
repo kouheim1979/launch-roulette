@@ -1,0 +1,49 @@
+name: Deploy あたまとおしり to GitHub Pages
+
+# main に push されたら、サイトを組み立てて gh-pages ブランチに置く。
+# GitHub Pages は gh-pages ブランチから配信される。
+# 公開先: https://kouheim1979.github.io/launch-roulette/atama-oshiri/
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "atama-oshiri/**"
+      - ".github/workflows/atama-oshiri-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build site
+        run: |
+          mkdir -p _site
+          cp -r atama-oshiri _site/atama-oshiri
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="ja">
+          <meta charset="utf-8">
+          <title>launch-roulette</title>
+          <meta http-equiv="refresh" content="0; url=./atama-oshiri/">
+          <p><a href="./atama-oshiri/">あたまとおしり</a></p>
+          </html>
+          HTML
+          touch _site/.nojekyll
+      - name: Push to gh-pages
+        run: |
+          cd _site
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" gh-pages
