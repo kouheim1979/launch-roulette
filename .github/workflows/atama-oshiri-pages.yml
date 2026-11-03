@@ -26,8 +26,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Build site (/launch-roulette/atama-oshiri/)
+        run: |
+          mkdir -p _site
+          cp -r atama-oshiri _site/atama-oshiri
+          cat > _site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="ja">
+          <meta charset="utf-8">
+          <title>launch-roulette</title>
+          <meta http-equiv="refresh" content="0; url=./atama-oshiri/">
+          <p><a href="./atama-oshiri/">あたまとおしり</a></p>
+          </html>
+          HTML
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: atama-oshiri
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
