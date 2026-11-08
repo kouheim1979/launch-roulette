@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="0" fill="#1B2353"/>
+  <g transform="rotate(-6 170 260)">
+    <rect x="78" y="128" width="184" height="246" rx="22" fill="#FFFFFF" stroke="#0E1433" stroke-width="10"/>
+    <text x="170" y="300" text-anchor="middle" font-family="Hiragino Sans, Noto Sans CJK JP, sans-serif" font-weight="900" font-size="150" fill="#1B2353">あ</text>
+  </g>
+  <g transform="rotate(6 342 260)">
+    <rect x="250" y="128" width="184" height="246" rx="22" fill="#F2B705" stroke="#0E1433" stroke-width="10"/>
+    <text x="342" y="300" text-anchor="middle" font-family="Hiragino Sans, Noto Sans CJK JP, sans-serif" font-weight="900" font-size="150" fill="#1B2353">い</text>
+  </g>
+</svg>

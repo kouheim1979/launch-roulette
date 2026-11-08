@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="最初と最後の文字が決まったお題に、あいだを埋めて言葉をつくる言葉あそびゲーム。">
+<meta name="theme-color" content="#EEF2FA" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#11152E" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="あたまとおしり">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>あたまとおしり</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Maru+Gothic:wght@500;700;900&display=swap">
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; -webkit-text-size-adjust: 100%; }
+/* Layout: one-screen game table — two tilted kana cards (頭・お尻) flank a blank middle; controls stack beneath. */
+:root {
+  --paper: #EEF2FA;
+  --paper-2: #E2E8F5;
+  --card: #FFFFFF;
+  --ink: #1B2353;
+  --muted: #5B6490;
+  --line: #CDD5EA;
+  --accent: #F2B705;
+  --accent-ink: #1B2353;
+  --hit: #17895A;
+  --miss: #C93E36;
+  --display: "Dela Gothic One", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --body: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #11152E; --paper-2: #181D3D; --card: #1D2349; --ink: #E9ECFB; --muted: #9CA3CB;
+    --line: #2F3767; --accent: #F6C433; --accent-ink: #11152E; --hit: #3CC487; --miss: #F07167;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #11152E; --paper-2: #181D3D; --card: #1D2349; --ink: #E9ECFB; --muted: #9CA3CB;
+  --line: #2F3767; --accent: #F6C433; --accent-ink: #11152E; --hit: #3CC487; --miss: #F07167;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  background: var(--paper);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 16px;
+  line-height: 1.6;
+}
+.wrap {
+  max-width: 640px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--display); font-weight: 400; font-size: 1.6rem; margin: 0; letter-spacing: .02em; text-wrap: balance; }
+h1 .amp { color: var(--accent); -webkit-text-stroke: 1px var(--ink); }
+.best { font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+/* stage */
+.stage { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding-block: 8px; }
+.kcard {
+  justify-self: center; display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.kcard .label { font-size: .75rem; font-weight: 700; letter-spacing: .2em; color: var(--muted); }
+.kcard .face {
+  width: clamp(96px, 28vw, 150px); aspect-ratio: 3 / 4; max-width: 100%;
+  background: var(--card); border: 3px solid var(--ink); border-radius: 14px;
+  box-shadow: 6px 6px 0 var(--ink);
+  display: grid; place-items: center;
+  font-family: var(--display); font-size: clamp(3.4rem, 15vw, 5.6rem); line-height: 1;
+}
+.kcard.head .face { transform: rotate(-4deg); }
+.kcard.tail .face { transform: rotate(4deg); background: var(--accent); color: var(--accent-ink); }
+.middle { display: flex; gap: 4px; align-items: center; justify-content: center; min-width: 48px; }
+.middle span {
+  width: 18px; height: 18px; border-radius: 50%; border: 2.5px dashed var(--muted);
+}
+.middle .free { font-family: var(--display); font-size: 1.6rem; color: var(--muted); letter-spacing: .1em; }
+.stage.pop .face { animation: pop .38s cubic-bezier(.3,1.6,.5,1); }
+@keyframes pop { from { scale: .6; opacity: .2; } to { scale: 1; opacity: 1; } }
+.rule { text-align: center; color: var(--muted); font-size: .9rem; margin: -6px 0 0; }
+
+/* hud */
+.hud { display: flex; gap: 10px; align-items: center; }
+.timer { flex: 1; height: 12px; border-radius: 99px; background: var(--paper-2); border: 2px solid var(--ink); overflow: hidden; }
+.timer i { display: block; height: 100%; width: 100%; background: var(--ink); transform-origin: left; }
+.timer.low i { background: var(--miss); }
+.stat { font-family: var(--display); font-variant-numeric: tabular-nums; font-size: 1.1rem; min-width: 4.2em; text-align: right; }
+.stat small { font-family: var(--body); font-size: .7rem; color: var(--muted); font-weight: 700; margin-right: 4px; }
+
+/* input */
+form.answer { display: flex; gap: 8px; }
+form.answer input {
+  flex: 1; min-width: 0; font: inherit; font-size: 1.3rem; font-weight: 700;
+  padding: 12px 14px; border-radius: 12px; border: 3px solid var(--ink);
+  background: var(--card); color: var(--ink);
+}
+form.answer input:focus { outline: 4px solid var(--accent); outline-offset: 1px; }
+button {
+  font: inherit; font-weight: 900; cursor: pointer; border-radius: 12px; border: 3px solid var(--ink);
+  padding: 10px 16px; background: var(--card); color: var(--ink); box-shadow: 3px 3px 0 var(--ink);
+  transition: transform .08s, box-shadow .08s;
+}
+button:hover { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--ink); }
+button:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 var(--ink); }
+button:focus-visible { outline: 4px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); }
+button.ghost { background: transparent; box-shadow: none; border-color: var(--line); color: var(--muted); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+.msg { min-height: 1.7em; text-align: center; font-weight: 700; margin: 0; }
+.msg.ok { color: var(--hit); }
+.msg.ng { color: var(--miss); }
+.confirm { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; align-items: center;
+  background: var(--card); border: 2px dashed var(--muted); border-radius: 12px; padding: 10px 12px; }
+.confirm p { margin: 0; flex-basis: 100%; text-align: center; font-size: .9rem; }
+
+/* log */
+.log { display: flex; flex-direction: column; gap: 6px; padding: 0; margin: 0; list-style: none; }
+.log li { display: flex; justify-content: space-between; gap: 10px; padding: 8px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--line); font-size: .95rem; }
+.log li .w { font-weight: 900; min-width: 0; overflow-wrap: anywhere; }
+.log li .w b { color: var(--muted); font-weight: 700; }
+.log li .p { font-variant-numeric: tabular-nums; font-weight: 700; white-space: nowrap; }
+.log li.pass .p { color: var(--miss); }
+.log li.pass .w { font-weight: 500; color: var(--muted); }
+.log li.self .p::after { content: "（自己申告）"; font-size: .7rem; color: var(--muted); }
+.section-title { font-size: .75rem; letter-spacing: .2em; color: var(--muted); font-weight: 700; margin: 0; }
+
+/* menu */
+.panel { background: var(--card); border: 3px solid var(--ink); border-radius: 18px; padding: 20px; display: flex; flex-direction: column; gap: 16px; box-shadow: 6px 6px 0 var(--ink); }
+.panel p { margin: 0; }
+.choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 420px) { .choices { grid-template-columns: 1fr; } }
+.choice { text-align: left; display: flex; flex-direction: column; gap: 2px; box-shadow: none; border-width: 2px; border-color: var(--line); }
+.choice[aria-pressed="true"] { border-color: var(--ink); background: var(--accent); color: var(--accent-ink); box-shadow: 3px 3px 0 var(--ink); }
+.choice small { font-weight: 500; font-size: .8rem; opacity: .85; }
+.example { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-size: 1.4rem; flex-wrap: wrap; }
+.example .t { display: inline-grid; place-items: center; width: 1.6em; height: 1.6em; border: 2px solid var(--ink); border-radius: 6px; }
+.example .t.o { background: var(--accent); color: var(--accent-ink); }
+.example .eq { font-family: var(--body); font-size: 1rem; color: var(--muted); font-weight: 700; }
+
+.big { font-family: var(--display); font-size: 3.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.result { text-align: center; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+.newbest { background: var(--accent); color: var(--accent-ink); font-weight: 900; padding: 2px 10px; border-radius: 99px; font-size: .85rem; }
+.answers { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.answers span { background: var(--card); border: 2px solid var(--ink); border-radius: 99px; padding: 2px 12px; font-weight: 700; }
+.shake { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@media (prefers-reduced-motion: reduce) { .stage.pop .face, .shake { animation: none; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>あたま<span class="amp">と</span>おしり</h1>
+    <div class="best" id="bestLabel"></div>
+  </header>
+
+  <!-- MENU -->
+  <section id="menu" class="panel">
+    <p><b>最初の文字（あたま）</b>と<b>最後の文字（おしり）</b>が決まっています。そのあいだを埋めて、言葉をつくってね。</p>
+    <div class="example" aria-label="例：あ と い で あかい">
+      <span class="t">あ</span><span class="eq">＋</span><span class="t">？</span><span class="eq">＋</span><span class="t o">い</span>
+      <span class="eq">→</span><span>あかい</span><span class="eq">・</span><span>あおい</span>
+    </div>
+    <div>
+      <p class="section-title">あそびかた</p>
+      <div class="choices" role="group" aria-label="あそびかた">
+        <button type="button" class="choice" id="modeSolo" aria-pressed="true">ひとりで<small>60秒でたくさん答えてスコアを競う</small></button>
+        <button type="button" class="choice" id="modeParty" aria-pressed="false">みんなで<small>お題を出して口で答える。早い者勝ち</small></button>
+      </div>
+    </div>
+    <div>
+      <p class="section-title">むずかしさ</p>
+      <div class="choices" role="group" aria-label="むずかしさ">
+        <button type="button" class="choice" id="lenFree" aria-pressed="true">ふつう<small>3文字以上ならなんでもOK</small></button>
+        <button type="button" class="choice" id="lenFixed" aria-pressed="false">文字数しばり<small>○の数ぴったりで答える</small></button>
+      </div>
+    </div>
+    <div class="row"><button type="button" class="primary" id="startBtn">はじめる</button></div>
+  </section>
+
+  <!-- GAME -->
+  <section id="game" hidden>
+    <div style="display:flex;flex-direction:column;gap:18px">
+      <div class="hud">
+        <div class="timer" id="timer"><i id="timerBar"></i></div>
+        <div class="stat" id="timeStat"><small>のこり</small><span id="timeNum">60</span></div>
+        <div class="stat" id="scoreStat"><small>点</small><span id="scoreNum">0</span></div>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="kcard head"><span class="label">あたま</span><div class="face" id="headChar">あ</div></div>
+        <div class="middle" id="middle"></div>
+        <div class="kcard tail"><span class="label">おしり</span><div class="face" id="tailChar">い</div></div>
+      </div>
+      <p class="rule" id="ruleText"></p>
+
+      <!-- solo -->
+      <div id="soloCtl" style="display:flex;flex-direction:column;gap:10px">
+        <form class="answer" id="answerForm" autocomplete="off">
+          <input id="answerInput" lang="ja" inputmode="text" placeholder="ひらがなで入力" aria-label="こたえ" enterkeyhint="send">
+          <button type="submit" class="primary">こたえる</button>
+        </form>
+        <div class="confirm" id="confirmBox" hidden>
+          <p id="confirmText"></p>
+          <button type="button" id="selfOk">ある言葉！（セーフ）</button>
+          <button type="button" class="ghost" id="selfNg">やっぱりやめる</button>
+        </div>
+        <p class="msg" id="msg" aria-live="polite"></p>
+        <div class="row">
+          <button type="button" id="passBtn">パス</button>
+          <button type="button" class="ghost" id="quitBtn">おわる</button>
+        </div>
+      </div>
+
+      <!-- party -->
+      <div id="partyCtl" hidden style="display:flex;flex-direction:column;gap:12px">
+        <div class="answers" id="partyAnswers" hidden></div>
+        <div class="row">
+          <button type="button" id="revealBtn">こたえを見る</button>
+          <button type="button" class="primary" id="nextBtn">つぎのお題</button>
+          <button type="button" class="ghost" id="partyQuit">おわる</button>
+        </div>
+      </div>
+
+      <p class="section-title" id="logTitle">これまでのこたえ</p>
+      <ul class="log" id="log"></ul>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section id="result" class="panel" hidden>
+    <div class="result">
+      <p class="section-title">けっか</p>
+      <div class="big" id="finalScore">0</div>
+      <p id="finalSub"></p>
+      <span class="newbest" id="newBest" hidden>ベスト更新！</span>
+    </div>
+    <ul class="log" id="finalLog"></ul>
+    <div class="row">
+      <button type="button" class="primary" id="againBtn">もういちど</button>
+      <button type="button" class="ghost" id="menuBtn">メニューへ</button>
+    </div>
+  </section>
+</div>
+
+<script>
+const RAW = `
+あさがお あめんぼ あいす あひる あくび あたま あさひ あおぞら あかちゃん あじさい あんぱん あぶら あした あなご あみど あいさつ あしあと あやとり あかり あらし あさり あかい あおい あつい あまい あたらしい あめ あり あし あき あみ あわ あんこ あぶらげ あまど あくま あいず あかとんぼ あおむし あざらし あひる あんず
+いちご いるか いのしし いかだ いなずま いちょう いとこ いもうと いど いけばな いたずら いちば いなか いのち いわし いろり いす いぬ いえ いか いけ いし いと いね いもむし いかり いなご いたい いしだん いりぐち いけす いそぎんちゃく
+うさぎ うちわ うどん うみがめ うぐいす うなぎ うちゅう うめぼし うわぎ うしろ うりぼう うきわ うし うま うみ うめ うた うで うそ うちゅうじん うえきばち うれしい うすい うまい うわさ うずら
+えんぴつ えのぐ えほん えだまめ えんそく えきいん えがお えりまき えんとつ えき えび えだ えさ えいが えんがわ えくぼ えんにち えらい えいご
+おにぎり おばけ おまつり おもちゃ おかし おでん おひるね おりがみ おとうと おんがく おやつ おにごっこ おすし おしろ おふろ おかね おに おの おけ おり おうむ おかめ おもち おしゃべり おとな おかず おかあさん おとうさん おおかみ おたまじゃくし おみこし おまもり おもい おおきい おいしい おもしろい おにいさん おねえさん おちゃ おなか おでこ
+かえる かたつむり かぶとむし からす かめ かさ かがみ かいだん かみなり かまきり かぼちゃ かばん かもめ かき かいもの かしわもち かざぐるま かんづめ かぞく かたな かに かぜ かみ かわ かお かご かぎ かい かえで かかし かもしか かいがら かつおぶし かまくら かれー かたぐるま からあげ かぶ かなづち かわいい かたい からい かるい かるた かたち かびん
+きつね きのこ きりん きゅうり きんぎょ きつつき きもの きって きゃべつ きしゃ きいろ きせつ きっぷ きく きし きた きず きぬ きのう きゅうしょく きんじょ きたない きびだんご きもだめし きんにく きつねうどん
+くじら くるま くつした くまで くすり くもり くしゃみ くちびる くりすます くわがた くさもち くじゃく くり くし くつ くも くま くさ くち くび くぎ くらげ くろい くるみ くしかつ くいず
+けしごむ けいと けむし けんだま けいさつ けしき けむり けいさん けーき けんか けが けいたい けしょう けやき けいろうのひ
+こたつ こあら こけし こいのぼり こまいぬ こおろぎ こんぶ こども ことり こよみ こむぎこ こうえん こしょう こま こめ こい こけ こし こうばん こおり こうもり こけこっこ こんにゃく こうちゃ こくばん ころっけ こわい ころも こずえ
+さくら さかな さつまいも さんま さいふ さとう さばく さんぽ さくらんぼ さむらい さいころ さっかー さる さめ さけ さら さかなや さかみち さいだー さんかく さんすう さむい さびしい さざえ さつき さんた さぼてん さらだ
+しまうま しいたけ しんぶん しゃしん しょうゆ しろくま しっぽ しおり しんかんせん しかく したじき しゃぼんだま しお しか しま しろ した しり しかい しじみ しめじ しまい しゅくだい しょうぼうしゃ しんごう しらたき しょくぱん しかばね しずく しりとり しろい しかくい しるし
+すいか すずめ すみれ すもう すいとう すべりだい すずむし すごろく すいせん すし すいぞくかん すな すず すみ すいとう すきやき すいはんき すりっぱ すぱげってぃ すいえい すずしい すっぱい すーぷ すけーと すべりだい すまほ すいでん すずらん
+せみ せんたく せなか せんせい せびろ せっけん せんぷうき せいざ せきとり せかい せき せり せんろ せんぬき せんたくもの せいかつ せまい せっぷん せーたー
+そうじ そろばん そらまめ そば そうめん そよかぜ そり そら そで そと そうこ そうりだいじん そふ そぼ そーす そふとくりーむ
+たぬき たまご たいこ たこやき たけのこ たんぽぽ たいよう たからもの たんす たわし たまねぎ たなばた たこ たい たけ たね たき たび たぬきそば たいいく たいそう たてもの たかい たのしい たくしー たこあげ たいふう たんぼ ためいき たらこ
+ちくわ ちょうちょ ちから ちゃわん ちらし ちりとり ちまき ちょきんばこ ちず ちち ちえ ちかてつ ちきゅう ちくわぶ ちゃいろ ちいさい ちーず ちょこれーと ちょうちん ちらしずし
+つくえ つばめ つみき つらら つけもの つきみ つくし つなひき つりばし つき つな つめ つる つの つくだに つみれ つばき つめたい つよい つりかわ つうしんぼ つるはし
+てがみ てぶくろ てんとうむし てるてるぼうず てつぼう てんぷら てまり てっぽう てんき てら てつ てんし てれび てーぶる てっきょう てんぐ てすと てぬぐい てあらい
+とけい とまと とうもろこし ともだち とびばこ とんぼ とんかつ とらんぷ とかげ とら とり とげ とし とびら とうふ とうだい としょかん とっきゅう とおい とびうお とりい とうがらし とまり
+どんぐり どうぶつ どうろ どろ どらやき どうくつ どじょう どれす どうぐ どんぶり
+なす なっとう なべ なまず なわとび なみだ なかま なのはな なつ なし なみ なわ なか なまえ なぞなぞ なまこ なにわ なつやすみ ながい ながぐつ なきむし なふだ
+にんじん にわとり にじ にもつ にんぎょう にぼし にほん にんじゃ にく にわ にし にきび にっき にんにく にがい にもの
+ぬいぐるみ ぬりえ ぬま ぬの ぬかづけ ぬれぎぬ
+ねこ ねずみ ねぎ ねんど ねっこ ねぶくろ ねじ ねんがじょう ねつ ねだん ねむい ねまき ねっくれす ねんれい ねこぜ
+のりまき のはら のこぎり のうか のれん のみもの のっぽ のり のど のみ のうみそ のりもの のこりもの のろし
+はさみ はなび はちみつ はくさい はにわ はしご はなたば はいたつ はりねずみ はなし はたけ はんこ はるまき はな はし はと はち はこ はり はね はれ はる はなぢ はんかち はみがき はなみ はやい はずかしい はさみむし はなよめ はつゆめ
+ひまわり ひこうき ひよこ ひなまつり ひつじ ひのき ひらめ ひしもち ひっこし ひがさ ひと ひも ひる ひげ ひざ ひかり ひみつ ひつじぐも ひろい ひくい ひだまり ひのまる ひよけ ひとで
+ふうせん ふくろう ふじさん ふとん ふね ふでばこ ふぐ ふうりん ふたご ふりかけ ふくわらい ふく ふえ ふゆ ふた ふで ふくろ ふみきり ふうとう ふかい ふるい ふくらはぎ ふらいぱん ふとい
+へび へちま へいわ へんじ へや へそ へい へた へいたい へっつい へんしん
+ほたる ほうき ほっぺた ほうれんそう ほしぞら ほんだな ほらあな ほうちょう ほし ほね ほん ほか ほたて ほこり ほうせき ほけんしつ ほそい ほっきょく ほうたい ほうがく ほとけ ほとり
+まくら まつり まんじゅう まないた まめまき まりも まぐろ まど まいご まつぼっくり まめ まち まつ まり まゆ まご まほう まじょ まつげ まるい まずい まよなか まんが まふらー まらそん
+みかん みずうみ みみず みこし みそしる みつばち みなと みどり みやげ みずたまり みみ みず みせ みち みそ みき みかづき みずぎ みはり みじかい みずいろ みそか みらい
+むぎちゃ むかで むしめがね むかし むらさき むささび むし むね むぎ むら むすめ むすこ むしば むずかしい むぎわらぼうし
+めだか めがね めろん めだま めいろ めんこ め めし めじろ めだる めいし めんどり めいじん めずらしい めかくし
+もみじ ももたろう もやし もぐら もちつき ものさし もなか もうふ もも もち もり もぐさ ものおき もくば もようがえ もりあがり もずく もみがら
+やきいも やかん やまびこ やどかり やさい やきとり やまのぼり やくそく やぎ やま やね やり やかた やおや やきゅう やきそば やさしい やすい やわらかい やもり やかい やまぶき
+ゆきだるま ゆかた ゆうやけ ゆびわ ゆりかご ゆでたまご ゆうびん ゆめ ゆき ゆび ゆり ゆか ゆげ ゆず ゆうれい ゆうがた ゆのみ ゆかい ゆうえんち
+よぞら ようかん よろい よつば ようふく よる よめ よこ よだれ よっと よみせ ようちえん よわい よろこび よもぎ ようかい
+らくだ らっぱ らいおん らーめん らんどせる らくがき らっこ らくご らいす らじお らっかせい らいねん
+りんご りす りぼん りゅう りょうり りんどう りか りく りょかん りんかく りゅっくさっく りもこん りょこう
+るすばん るーる るびー るす るすでん
+れんこん れいぞうこ れもん れんが れっしゃ れきし れたす れいか れんしゅう れすとらん れいんこーと
+ろうそく ろけっと ろうか ろば ろぼっと ろうじん ろてんぶろ ろくが ろんどん
+わさび わたあめ わなげ わかめ わらび わすれもの わたりどり わりばし わに わた わし わら わたし わかい わごむ わふく わかば
+がっこう がか がちょう がいこつ がまぐち がむ ぎんなん ぎんこう ぎょうざ ぎたー ぎゅうにゅう ぐんて ぐみ げた げんかん げーむ げつようび ごはん ごりら ごぼう ごま ごみばこ ごちそう ごはんつぶ
+ざるそば ざりがに ざぶとん ざっし じてんしゃ じしゃく じゃがいも じかん じゅーす じどうしゃ じゃんけん じんじゃ ずかん ずぼん ずこう ぜんまい ぜりー ぜっけい ぞう ぞうきん ぞうり
+だんご だるま だいこん だちょう だいどころ だんごむし だいず でんしゃ でんわ でんき でんでんむし どうぐ どんぐり
+ばなな ばけつ ばす ばった ばんそうこう ばたー ばれー ばいく びわ びーだま びじゅつかん びょういん びん ぶどう ぶらんこ ぶた ぶたにく ぶりっじ べんとう べっど べんち べると ぼうし ぼたもち ぼうし ぼーる ぼたん ぼうえんきょう
+ぱんだ ぱじゃま ぱそこん ぱん ぱいなっぷる ぱんけーき ぴあの ぴーまん ぴざ ぴえろ ぷりん ぷーる ぷれぜんと ぺんぎん ぺんき ぺん ぽすと ぽっぷこーん ぽけっと ぽんず
+`;
+const DICT = [...new Set(RAW.split(/\s+/).filter(Boolean))];
+const DICT_SET = new Set(DICT);
+const BAD_TAIL = new Set([..."ーゃゅょっぁぃぅぇぉ"]);
+const QUESTIONS = DICT.filter(w => w.length >= 3 && !BAD_TAIL.has(w.at(-1)));
+
+const $ = id => document.getElementById(id);
+const toHira = s => s.normalize("NFKC").replace(/[\s　]/g, "")
+  .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
+
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+
+const SOLO_TIME = 60, PARTY_TIME = 20;
+let cfg = { mode: "solo", fixed: false };
+let st = null, tick = null;
+
+function bestKey() { return "aoshiri-best-" + (cfg.fixed ? "fixed" : "free"); }
+function showBest() {
+  const b = store.get(bestKey(), 0);
+  $("bestLabel").textContent = cfg.mode === "solo" && b ? `ベスト ${b}点（${cfg.fixed ? "文字数しばり" : "ふつう"}）` : "";
+}
+
+function answersFor(q) {
+  return DICT.filter(w => w.length >= 3 && w[0] === q.h && w.at(-1) === q.t && (!q.len || w.length === q.len));
+}
+function pickQuestion() {
+  for (let i = 0; i < 50; i++) {
+    const w = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+    const q = { h: w[0], t: w.at(-1), len: cfg.fixed ? w.length : 0 };
+    const key = q.h + q.t + q.len;
+    if (st.recent.includes(key)) continue;
+    // ひとりモードでは、まだ使っていない答えが残っているお題だけ
+    if (answersFor(q).every(a => st.used.has(a))) continue;
+    st.recent = [key, ...st.recent].slice(0, 12);
+    return q;
+  }
+  const w = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+  return { h: w[0], t: w.at(-1), len: cfg.fixed ? w.length : 0 };
+}
+
+function renderQuestion() {
+  const q = st.q;
+  $("headChar").textContent = q.h;
+  $("tailChar").textContent = q.t;
+  const mid = $("middle");
+  mid.innerHTML = "";
+  if (q.len) {
+    for (let i = 0; i < q.len - 2; i++) mid.appendChild(document.createElement("span"));
+    $("ruleText").textContent = `ぜんぶで${q.len}文字`;
+  } else {
+    const s = document.createElement("span"); s.className = "free"; s.textContent = "…";
+    s.style.cssText = "width:auto;height:auto;border:0";
+    mid.appendChild(s);
+    $("ruleText").textContent = "3文字以上";
+  }
+  const stage = $("stage");
+  stage.classList.remove("pop"); void stage.offsetWidth; stage.classList.add("pop");
+  $("partyAnswers").hidden = true;
+}
+
+function setMsg(text, kind) { const m = $("msg"); m.textContent = text; m.className = "msg " + (kind || ""); }
+
+function addLog(item) {
+  st.log.unshift(item);
+  const li = document.createElement("li");
+  li.className = item.type;
+  const w = document.createElement("span"); w.className = "w";
+  const p = document.createElement("span"); p.className = "p";
+  if (item.type === "pass") {
+    w.innerHTML = `<b>${item.h}…${item.t}</b>　${item.examples.length ? "例：" + item.examples.join("・") : ""}`;
+    p.textContent = "パス";
+  } else {
+    w.textContent = item.word;
+    p.textContent = `+${item.pts}`;
+  }
+  $("log").prepend(li); li.append(w, p);
+}
+
+function nextQuestion() { st.q = pickQuestion(); renderQuestion(); }
+
+function start() {
+  st = { score: 0, streak: 0, used: new Set(), recent: [], log: [], time: cfg.mode === "solo" ? SOLO_TIME : PARTY_TIME, round: 0, pending: null };
+  $("menu").hidden = true; $("result").hidden = true; $("game").hidden = false;
+  $("log").innerHTML = "";
+  $("soloCtl").hidden = cfg.mode !== "solo";
+  $("soloCtl").style.display = cfg.mode === "solo" ? "flex" : "none";
+  $("partyCtl").hidden = cfg.mode !== "party";
+  $("partyCtl").style.display = cfg.mode === "party" ? "flex" : "none";
+  $("scoreStat").hidden = cfg.mode !== "solo";
+  $("logTitle").hidden = $("log").hidden = cfg.mode !== "solo";
+  $("confirmBox").hidden = true;
+  setMsg("");
+  $("answerInput").value = "";
+  nextQuestion();
+  updateHud();
+  startTimer();
+  if (cfg.mode === "solo") $("answerInput").focus();
+}
+
+function startTimer() {
+  clearInterval(tick);
+  const total = cfg.mode === "solo" ? SOLO_TIME : PARTY_TIME;
+  const startAt = performance.now(), startTime = st.time;
+  tick = setInterval(() => {
+    st.time = Math.max(0, startTime - (performance.now() - startAt) / 1000);
+    updateHud(total);
+    if (st.time <= 0) {
+      clearInterval(tick);
+      if (cfg.mode === "solo") finish(); else reveal();
+    }
+  }, 100);
+}
+
+function updateHud(total = cfg.mode === "solo" ? SOLO_TIME : PARTY_TIME) {
+  $("timeNum").textContent = Math.ceil(st.time);
+  $("scoreNum").textContent = st.score;
+  $("timerBar").style.transform = `scaleX(${st.time / total})`;
+  $("timer").classList.toggle("low", st.time <= 10 && cfg.mode === "solo" || st.time <= 5);
+}
+
+function shake() { const f = $("answerForm"); f.classList.remove("shake"); void f.offsetWidth; f.classList.add("shake"); }
+
+function accept(word, self) {
+  st.streak++;
+  const bonus = Math.min(st.streak - 1, 5) * 5;
+  const pts = word.length * 10 + bonus;
+  st.score += pts;
+  st.used.add(word);
+  addLog({ type: self ? "self" : "hit", word, pts });
+  setMsg(`${word}　+${pts}点${bonus ? `（${st.streak}れんぞく！）` : ""}`, "ok");
+  $("answerInput").value = "";
+  nextQuestion(); updateHud();
+}
+
+function submitAnswer(e) {
+  e.preventDefault();
+  if (!st || st.time <= 0) return;
+  const q = st.q;
+  const w = toHira($("answerInput").value);
+  if (!w) return;
+  $("confirmBox").hidden = true; st.pending = null;
+  if (w[0] !== q.h) { setMsg(`「${q.h}」から始めてね`, "ng"); return shake(); }
+  if (w.at(-1) !== q.t) { setMsg(`「${q.t}」で終わってね`, "ng"); return shake(); }
+  if (q.len && w.length !== q.len) { setMsg(`${q.len}文字ぴったりで答えてね（いま${w.length}文字）`, "ng"); return shake(); }
+  if (!q.len && w.length < 3) { setMsg("あいだに1文字以上入れてね", "ng"); return shake(); }
+  if (st.used.has(w)) { setMsg("その言葉はもう使ったよ", "ng"); return shake(); }
+  if (DICT_SET.has(w)) return accept(w, false);
+  st.pending = w;
+  $("confirmText").textContent = `「${w}」はこのゲームの辞書にない言葉です。ほんとうにある言葉ならセーフにできます。`;
+  $("confirmBox").hidden = false;
+  setMsg("");
+}
+
+function pass() {
+  if (!st || st.time <= 0) return;
+  const ex = answersFor(st.q).filter(a => !st.used.has(a)).slice(0, 3);
+  addLog({ type: "pass", h: st.q.h, t: st.q.t, examples: ex });
+  st.streak = 0;
+  setMsg(ex.length ? `例：${ex.join("・")}` : "");
+  $("confirmBox").hidden = true; $("answerInput").value = "";
+  nextQuestion();
+  $("answerInput").focus();
+}
+
+function finish() {
+  clearInterval(tick);
+  $("game").hidden = true; $("result").hidden = false;
+  const hits = st.log.filter(l => l.type !== "pass").length;
+  const passes = st.log.length - hits;
+  $("finalScore").textContent = st.score + "点";
+  $("finalSub").textContent = `こたえた言葉 ${hits}こ・パス ${passes}かい`;
+  const prev = store.get(bestKey(), 0);
+  $("newBest").hidden = !(st.score > prev && st.score > 0);
+  if (st.score > prev) store.set(bestKey(), st.score);
+  $("finalLog").innerHTML = "";
+  [...st.log].reverse().forEach(item => {
+    const li = document.createElement("li"); li.className = item.type;
+    const w = document.createElement("span"); w.className = "w";
+    const p = document.createElement("span"); p.className = "p";
+    if (item.type === "pass") { w.innerHTML = `<b>${item.h}…${item.t}</b>　${item.examples.length ? "例：" + item.examples.join("・") : ""}`; p.textContent = "パス"; }
+    else { w.textContent = item.word; p.textContent = `+${item.pts}`; }
+    li.append(w, p); $("finalLog").append(li);
+  });
+  showBest();
+}
+
+/* party */
+function reveal() {
+  clearInterval(tick);
+  const box = $("partyAnswers");
+  const ans = answersFor(st.q).sort(() => Math.random() - .5).slice(0, 10);
+  box.innerHTML = "";
+  ans.forEach(a => { const s = document.createElement("span"); s.textContent = a; box.append(s); });
+  box.hidden = false;
+}
+function partyNext() { st.time = PARTY_TIME; nextQuestion(); updateHud(); startTimer(); }
+
+function toMenu() { clearInterval(tick); $("game").hidden = true; $("result").hidden = true; $("menu").hidden = false; showBest(); }
+
+function pick(a, b, val, key) {
+  $(a).onclick = () => { cfg[key] = val[0]; $(a).setAttribute("aria-pressed", "true"); $(b).setAttribute("aria-pressed", "false"); showBest(); };
+  $(b).onclick = () => { cfg[key] = val[1]; $(b).setAttribute("aria-pressed", "true"); $(a).setAttribute("aria-pressed", "false"); showBest(); };
+}
+pick("modeSolo", "modeParty", ["solo", "party"], "mode");
+pick("lenFree", "lenFixed", [false, true], "fixed");
+$("startBtn").onclick = start;
+$("answerForm").addEventListener("submit", submitAnswer);
+$("selfOk").onclick = () => { if (st.pending && st.time > 0) { const w = st.pending; st.pending = null; $("confirmBox").hidden = true; accept(w, true); $("answerInput").focus(); } };
+$("selfNg").onclick = () => { st.pending = null; $("confirmBox").hidden = true; $("answerInput").select(); };
+$("passBtn").onclick = pass;
+$("quitBtn").onclick = finish;
+$("revealBtn").onclick = reveal;
+$("nextBtn").onclick = partyNext;
+$("partyQuit").onclick = toMenu;
+$("againBtn").onclick = start;
+$("menuBtn").onclick = toMenu;
+showBest();
+</script>
+<script>
+if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>
