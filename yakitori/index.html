@@ -49,7 +49,8 @@
   --ok: #4CC184; --bad: #F07160; color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-.board, .board * { touch-action: none; }
+.board, .board * { touch-action: pan-y; }
+.sk, .sk * { touch-action: none; }
 [hidden] { display: none !important; }
 html, body { margin: 0; min-height: 100%; overflow-x: hidden; }
 body {
@@ -111,17 +112,26 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .behind svg { width: 24px; height: 16px; }
 .behind .nn { font-size: .68rem; font-weight: 900; white-space: nowrap; }
 .behind.none { visibility: hidden; }
-/* 焼き台：つぎの段 */
-.nextrow { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; background: rgba(0,0,0,.4); border-radius: 6px; padding: 3px 0 2px; margin-bottom: 4px; position: relative; }
-.nextrow .lbl { position: absolute; left: -2px; top: -9px; font-size: .58rem; font-weight: 900; color: #fff; background: var(--noren); border-radius: 4px; padding: 0 4px; line-height: 1.4; z-index: 2; }
-.nextrow .ni { display: flex; justify-content: center; align-items: center; height: 20px; }
-.nextrow .ni svg { width: 28px; height: 19px; filter: saturate(.85); }
-.nextrow .ni.empty::after { content: ""; width: 10px; height: 2px; background: rgba(255,255,255,.25); border-radius: 1px; }
-.nextrow.last .ni { opacity: .9; }
+/* 焼き台の下のお皿：つぎに焼き台へ載せる串 */
+.gw { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.plate {
+  position: relative; height: 46px; margin: 0 4px; border-radius: 50% / 46%;
+  background: radial-gradient(ellipse at 50% 40%, #FFFFFF 0 55%, #ECE5DA 56% 100%);
+  border: 2px solid #CDBFAA; display: grid; grid-template-columns: repeat(3, 1fr); padding: 0 12%; align-items: center;
+}
+.plate.s2 { box-shadow: 0 4px 0 -1px #E6DCCD, 0 4px 0 1px #CDBFAA; }
+.plate.s3 { box-shadow: 0 4px 0 -1px #E6DCCD, 0 4px 0 1px #CDBFAA, 0 8px 0 -1px #E6DCCD, 0 8px 0 1px #CDBFAA; }
+.plate .ps { display: flex; justify-content: center; height: 40px; }
+.plate .ps svg { width: 14px; height: 40px; }
+.plate .cnt { position: absolute; right: -6px; top: -8px; background: var(--noren); color: #fff; font-size: .6rem; font-weight: 900; border-radius: 999px; padding: 0 5px; line-height: 1.5; }
+.plate .lbl { position: absolute; left: -6px; top: -8px; background: var(--ink); color: var(--paper); font-size: .58rem; font-weight: 900; border-radius: 4px; padding: 0 4px; line-height: 1.5; }
+.plate.empty { background: none; border: 2px dashed var(--line); opacity: .6; }
+.plate.empty::after { content: "おわり"; grid-column: 1 / -1; text-align: center; font-size: .65rem; color: var(--muted); font-weight: 700; }
+.plate.pop .ps { animation: popin .3s cubic-bezier(.3,1.6,.5,1); }
 
 /* 焼き台 */
 .tip { text-align: center; font-size: .8rem; color: var(--muted); margin: 0; text-wrap: balance; }
-.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; align-content: start; flex: 1; touch-action: none; }
+.board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 8px; align-content: start; flex: 1; }
 .grill {
   position: relative; background: var(--grill); border: 3px solid var(--grill-rim); border-radius: 10px;
   padding: 6px 4px 4px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
@@ -339,7 +349,7 @@ function startLevel(retry = false) {
   $("tip").textContent = S.level === 1
     ? "串をタップ（またはドラッグ）して別の焼き台へ。同じ串を3本そろえると焼けて注文に届くよ！"
     : `LEVEL ${S.level}：串${spec.kinds}種類・${lay.orders.length}皿`;
-  $("board").innerHTML = ""; gEls.clear();
+  $("board").innerHTML = ""; gEls.clear(); pEls.clear();
   renderSeats(true); render(); fillQueue();
 }
 
@@ -481,6 +491,20 @@ function saveBest(level) {
 function gameOver() { if (L.done) return; L.done = true; saveBest(S.level - 1); showModal("over"); }
 
 // ---- 描画 ----
+function renderPlate(g) {
+  const pl = pEls.get(g.id); if (!pl) return;
+  const nx = g.layers[0], n = g.layers.length;
+  const sig = n + ":" + (nx || []).join(",");
+  if (pl.dataset.sig === sig) return;
+  const changed = pl.dataset.sig !== undefined;
+  pl.dataset.sig = sig;
+  pl.hidden = !L.hasLayers;
+  if (!nx) { pl.className = "plate empty"; pl.innerHTML = ""; return; }
+  pl.className = "plate" + (n >= 3 ? " s3" : n === 2 ? " s2" : "") + (changed ? " pop" : "");
+  pl.innerHTML = `<span class="lbl">つぎ</span>` + (n > 1 ? `<span class="cnt">あと${n}皿</span>` : "")
+    + nx.map(k => `<div class="ps">${k ? skSVG(k) : ""}</div>`).join("");
+}
+const pEls = new Map();
 const gEls = new Map(), popIn = new Set(), cooking = new Set();
 function render() {
   const board = $("board");
@@ -489,21 +513,22 @@ function render() {
   const used = board.getBoundingClientRect().top + window.scrollY;
   const availH = window.innerHeight - used - 110;
   const colW = (board.clientWidth - 16) / 3;
-  const sh = Math.max(64, Math.min(110, Math.floor(availH / rows) - (L.hasLayers ? 56 : 26), Math.floor(colW / 3 * 2.9)));
+  const sh = Math.max(64, Math.min(110, Math.floor(availH / rows) - (L.hasLayers ? 80 : 26), Math.floor(colW / 3 * 2.9)));
   board.style.setProperty("--sh", sh + "px");
 
   L.grills.forEach((g, gi) => {
     let el = gEls.get(g.id);
     if (!el) {
+      const w = document.createElement("div"); w.className = "gw";
       el = document.createElement("div"); el.className = "grill"; el.dataset.id = g.id;
-      gEls.set(g.id, el); board.appendChild(el);
+      const pl = document.createElement("div"); pl.className = "plate";
+      w.append(el, pl); board.appendChild(w);
+      gEls.set(g.id, el); pEls.set(g.id, pl);
     }
     const sig = g.slots.join(",") + "|" + (g.layers[0] || []).join(",") + g.layers.length + "|" + g.busy;
     if (el.dataset.sig !== sig || [...popIn].some(k => k.startsWith(g.id + ":"))) {
-      const nx = g.layers[0];
-      const strip = !L.hasLayers ? "" : `<div class="nextrow">${nx ? `<span class="lbl">つぎ${g.layers.length > 1 ? `（あと${g.layers.length}段）` : ""}</span>` : ""}`
-        + [0, 1, 2].map(si => nx && nx[si] ? `<div class="ni">${icon(nx[si])}</div>` : `<div class="ni empty"></div>`).join("") + `</div>`;
-      el.innerHTML = strip + g.slots.map((k, si) => {
+      renderPlate(g);
+      el.innerHTML = g.slots.map((k, si) => {
         if (!k) return `<div class="slot" data-s="${si}"></div>`;
         const key = g.id + ":" + si, pop = popIn.has(key); popIn.delete(key);
         return `<div class="slot" data-s="${si}"><div class="sk${pop ? " pop" : ""}${g.busy ? " cook" : ""}" data-s="${si}" aria-label="${KINDS[k].name}">${skSVG(k)}</div>${g.busy && si === 1 ? `<span class="smoke"></span><span class="smoke" style="animation-delay:.35s;margin-left:-12px"></span><span class="smoke" style="animation-delay:.7s;margin-left:12px"></span>` : ""}</div>`;
@@ -513,6 +538,7 @@ function render() {
     }
     const selHere = L.sel && L.sel.g === gi;
     el.querySelectorAll(".sk").forEach(s => s.classList.toggle("sel", !!selHere && +s.dataset.s === L.sel.s));
+    el.querySelectorAll(".sk").forEach(s => s.classList.toggle("dragging", !!(drag && drag.moved && drag.gi === gi && +s.dataset.s === drag.si)));
     el.classList.toggle("can", !!L.sel && !selHere && hasSpace(g));
   });
   $("shuffle").disabled = L.shuffleLeft <= 0;
@@ -589,7 +615,7 @@ $("board").addEventListener("pointermove", e => {
     drag.ghost = document.createElement("div"); drag.ghost.className = "ghost";
     drag.ghost.style.height = getComputedStyle($("board")).getPropertyValue("--sh");
     drag.ghost.innerHTML = skSVG(k); document.body.appendChild(drag.ghost);
-    render(); const sk = gEls.get(L.grills[drag.gi].id).querySelector(`.sk[data-s="${drag.si}"]`); sk && sk.classList.add("dragging");
+    render();
   }
   if (drag.moved) {
     drag.ghost.style.left = e.clientX + "px"; drag.ghost.style.top = e.clientY + "px";
@@ -616,7 +642,16 @@ function endDrag(e) {
   tap(d.gi, d.si, d.slot);
 }
 $("board").addEventListener("pointerup", endDrag);
-$("board").addEventListener("pointercancel", e => { if (drag && drag.ghost) drag.ghost.remove(); drag = null; L && (L.sel = null, render()); });
+window.addEventListener("pointerup", e => drag && endDrag(e));
+function cancelDrag() {
+  if (!drag) return;
+  if (drag.ghost) drag.ghost.remove();
+  const wasMoved = drag.moved; drag = null;
+  gEls.forEach(el => el.classList.remove("hover"));
+  if (L) { if (wasMoved) L.sel = null; render(); }
+}
+$("board").addEventListener("pointercancel", cancelDrag);
+window.addEventListener("blur", cancelDrag);
 
 function tap(gi, si, slot) {
   const g = L.grills[gi];
@@ -663,7 +698,7 @@ function showModal(type) {
       <ul class="rules">
         <li>串をタップして別の焼き台をタップ（ドラッグでもOK）で、空いてる場所へうつせる</li>
         <li>ひとつの焼き台に同じ串が3本そろうと焼けて、注文したお客さんに届く</li>
-        <li>焼き台の上の「つぎ」に、その焼き台が空になったら出てくる串が見える</li>
+        <li>焼き台の下のお皿が「つぎ」。焼き台が空になると、お皿の串が載る</li>
         <li>お客さんのうしろの「つぎ」が、次にその席に座る人の注文</li>
         <li>早く届けるほどチップが多い。3人おこらせると閉店…</li>
       </ul>
